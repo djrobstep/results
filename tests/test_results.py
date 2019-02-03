@@ -127,29 +127,6 @@ def test_slice(sample):
     assert r[1:2] == results.Results([sample[1]])
 
 
-def test_pivot():
-    UNPIVOTED = [
-        dict(state="NSW", party="Pink", votes=10),
-        dict(state="NSW", party="Orange", votes=1),
-        dict(state="VIC", party="Pink", votes=11),
-        dict(state="VIC", party="Orange", votes=2),
-        dict(state="VIC", party="Yellow", votes=5),
-    ]
-
-    PIVOTED = [
-        {"state": "NSW", "Pink": 10, "Orange": 1, "Yellow": None},
-        {"state": "VIC", "Pink": 11, "Orange": 2, "Yellow": 5},
-    ]
-
-    r = results.Results(UNPIVOTED)
-    pivoted = results.Results(PIVOTED)
-    assert r.pivoted() == results.Results(PIVOTED)
-
-    pivoted.replace_values(None, 0)
-    PIVOTED[0]["Yellow"] = 0
-    assert pivoted == PIVOTED
-
-
 def test_hierarchical():
     ORIGINAL = [
         dict(state="NSW", party="Pink", candidate="A"),

@@ -221,6 +221,9 @@ class Results(list, AnnotationsMixin):
         return self.one()[0]
 
     def pivoted(self):
+        from .pivoting import pivoted
+
+        return pivoted(self)
         try:
             down, across, values = self.keys()
         except ValueError:
