@@ -46,12 +46,33 @@ def test_pivot_multi_down():
     ]
 
     PIVOTED = [
-        {"state": "NSW", "year": 2015, "Magenta": None, "Pink": 10, "Orange": 1, "Yellow": None},
-        {"state": "VIC", "year": 2015, "Magenta": 3, "Pink": 11, "Orange": 2, "Yellow": None},
-        {"state": "VIC", "year": 2018, "Magenta": None, "Pink": None, "Orange": None, "Yellow": 5},
+        {
+            "state": "NSW",
+            "year": 2015,
+            "Magenta": None,
+            "Pink": 10,
+            "Orange": 1,
+            "Yellow": None,
+        },
+        {
+            "state": "VIC",
+            "year": 2015,
+            "Magenta": 3,
+            "Pink": 11,
+            "Orange": 2,
+            "Yellow": None,
+        },
+        {
+            "state": "VIC",
+            "year": 2018,
+            "Magenta": None,
+            "Pink": None,
+            "Orange": None,
+            "Yellow": 5,
+        },
     ]
 
     r = results.Results(UNPIVOTED)
     pivoted = results.Results(PIVOTED)
-    assert pivoted.keys() == ['state', 'year', 'Magenta', 'Pink', 'Orange', 'Yellow']
+    assert pivoted.keys() == ["state", "year", "Magenta", "Pink", "Orange", "Yellow"]
     assert r.pivoted() == results.Results(PIVOTED)

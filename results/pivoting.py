@@ -94,9 +94,7 @@ def pivoted(_results):
     downvalues = r.distinct_values(columns=down)
 
     orders = [
-        _.distinct_values(column=across)
-        for _
-        in r.grouped_by(columns=down).values()
+        _.distinct_values(column=across) for _ in r.grouped_by(columns=down).values()
     ]
     acrossvalues = ordering(orders)
     key_cols = down + [across]

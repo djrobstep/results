@@ -7,6 +7,7 @@ from results import (
     detect_string_enc,
     dicts_from_rows,
     files,
+    from_file,
     from_files,
     smart_open,
 )
@@ -58,3 +59,13 @@ def test_open_all():
         from_files(flist, ignore_unopenable=False)
 
     from_files(flist)
+
+
+def test_xlsx_readwrite(tmpdir):
+    csvresults = from_file("tests/FIXTURES/datafiles/x.csv")
+
+    dest = str(tmpdir / "out.xlsx")
+    csvresults.save_xlsx(dest)
+    xlsxresults = from_file(dest)
+
+    assert csvresults == xlsxresults["Sheet1"]

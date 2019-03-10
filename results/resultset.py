@@ -171,6 +171,18 @@ class Results(list, AnnotationsMixin):
     def save_csv(self, destination):
         Path(destination).write_text(self.csv)
 
+    def save_xlsx(self, destination):
+        from xlsxwriter import Workbook
+
+        workbook = Workbook(destination)
+        worksheet = workbook.add_worksheet()
+
+        for r, row in enumerate([self.keys()] + self):
+            for c, col in enumerate(row):
+                worksheet.write(r, c, col)
+
+        workbook.close()
+
     def keys(self):
         try:
             first = self[0]
