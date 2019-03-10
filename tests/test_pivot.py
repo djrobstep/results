@@ -53,4 +53,5 @@ def test_pivot_multi_down():
 
     r = results.Results(UNPIVOTED)
     pivoted = results.Results(PIVOTED)
+    assert pivoted.keys() == ['state', 'year', 'Magenta', 'Pink', 'Orange', 'Yellow']
     assert r.pivoted() == results.Results(PIVOTED)

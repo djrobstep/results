@@ -76,8 +76,8 @@ def ordering(groups):
             if d_before[k] - set(_result):
                 continue
             _result.append(k)
-
             d_all.pop(k)
+            break
 
     return _result
 
@@ -93,8 +93,12 @@ def pivoted(_results):
 
     downvalues = r.distinct_values(columns=down)
 
-    acrossvalues = r.distinct_values(across)
-
+    orders = [
+        _.distinct_values(column=across)
+        for _
+        in r.grouped_by(columns=down).values()
+    ]
+    acrossvalues = ordering(orders)
     key_cols = down + [across]
 
     def cell_key(row):
