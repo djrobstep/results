@@ -70,10 +70,7 @@ def ordering(groups):
 
     all_keys = {k: None for k in d_all.keys()}
 
-    while True:
-        if not all_keys:
-            break
-
+    while all_keys:
         for k in all_keys:
             if d_before[k] - set(_result):
                 continue
