@@ -68,16 +68,22 @@ def ordering(groups):
 
     _result = []
 
+    all_keys = {k: None for k in d_all.keys()}
+
     while True:
-        if not d_all:
+        if not all_keys:
             break
 
-        for k in list(d_all.keys()):
+        for k in all_keys:
             if d_before[k] - set(_result):
                 continue
             _result.append(k)
-            d_all.pop(k)
+            all_keys.pop(k)
             break
+        else:
+            k = list(all_keys.keys())[0]
+            _result.append(k)
+            all_keys.pop(k)
 
     return _result
 
@@ -88,8 +94,11 @@ def pivoted(_results):
         *down, across, values = r.keys()
     except ValueError:
         raise ValueError(
-            "Pivoting requires at least 3 columns for input: 1 or more for row labels, 1 for column labels, and one values column"
+            "Pivoting requires at least 2 columns for input: 1 or more row labels, 0 or 1 column labels, and one values column"
         )
+
+    if not down:
+        return Results(_results)
 
     downvalues = r.distinct_values(columns=down)
 

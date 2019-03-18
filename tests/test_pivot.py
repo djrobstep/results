@@ -76,3 +76,61 @@ def test_pivot_multi_down():
     pivoted = results.Results(PIVOTED)
     assert pivoted.keys() == ["state", "year", "Magenta", "Pink", "Orange", "Yellow"]
     assert r.pivoted() == results.Results(PIVOTED)
+
+
+def test_otherbad():
+    BAD = [{"Area": "A", "Count": 2}, {"Area": "B", "Count": 1}]
+    assert results.Results(BAD) == results.Results(BAD).pivoted()
+
+
+def test_badcase():
+    BAD = [
+        dict(year=2015, state="NSW", party="Pink", votes=10),
+        dict(year=2015, state="NSW", party="Orange", votes=1),
+        dict(year=2015, state="VIC", party="Magenta", votes=3),
+        dict(year=2018, state="VIC", party="Pink", votes=10),
+        dict(year=2018, state="VIC", party="Magenta", votes=3),
+        dict(year=2018, state="NSW", party="Yellow", votes=1),
+        dict(year=2018, state="NSW", party="Orange", votes=1),
+    ]
+
+    PIVOTED = [
+        {
+            "Magenta": None,
+            "Orange": 1,
+            "Pink": 10,
+            "Yellow": None,
+            "state": "NSW",
+            "year": 2015,
+        },
+        {
+            "Magenta": 3,
+            "Orange": None,
+            "Pink": None,
+            "Yellow": None,
+            "state": "VIC",
+            "year": 2015,
+        },
+        {
+            "Magenta": 3,
+            "Orange": None,
+            "Pink": 10,
+            "Yellow": None,
+            "state": "VIC",
+            "year": 2018,
+        },
+        {
+            "Magenta": None,
+            "Orange": 1,
+            "Pink": None,
+            "Yellow": 1,
+            "state": "NSW",
+            "year": 2018,
+        },
+    ]
+
+    pivoted = results.Results(BAD).pivoted()
+    EXPECTED = results.Results(PIVOTED)
+    assert pivoted == EXPECTED
+
+    assert pivoted.keys() == ["year", "state", "Pink", "Magenta", "Yellow", "Orange"]
