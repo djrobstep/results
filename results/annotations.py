@@ -1,5 +1,5 @@
 from numbers import Number
-
+import decimal
 
 class AnnotationsMixin:
     def annotate_histogram_amplitudes(self):
@@ -17,7 +17,7 @@ class AnnotationsMixin:
             _max = max(filtered)
             min0 = min(_min, 0.0)
             max0 = max(0.0, _max)
-            _range = max0 - min0
+            _range = decimal.Decimal(max0) - decimal.Decimal(min0)
 
             _subclasses_by_type = {}
 
@@ -30,15 +30,15 @@ class AnnotationsMixin:
                 v0, v1 = sorted([0.0, v])
 
                 try:
-                    d = v0 - min0
-                    start = d / _range
+                    d = decimal.Decimal(v0) - decimal.Decimal(min0)
+                    start = decimal.Decimal(d) / decimal.Decimal(_range)
                     h0 = start
                 except ZeroDivisionError:
                     h0 = 0.0
 
                 try:
-                    d = v1 - min0
-                    end = d / _range
+                    d = decimal.Decimal(v1) - decimal.Decimal(min0)
+                    end = decimal.Decimal(d) / decimal.Decimal(_range)
                     h1 = end
                 except ZeroDivisionError:
                     h1 = 0.0

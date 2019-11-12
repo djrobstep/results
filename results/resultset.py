@@ -175,6 +175,7 @@ class Results(list, AnnotationsMixin):
 
     def distinct_values(self, column=None, columns=None):
         values = self.values_for(column, columns)
+
         d = {k: True for k in values}
         return list(d.keys())
 
