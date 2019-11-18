@@ -10,6 +10,14 @@ INSERT = """
         ({valuespec})
 """
 
+
+INSERT_DEFAULT = """
+    insert into
+        {table}
+    default values
+"""
+
+
 INSERT_UPSERT = """
     on conflict ({upsertkeyspec})
     do update set
@@ -43,8 +51,12 @@ def valid(key):
 
 
 def insert(s, table, rows, upsert_on=None, returning=None):
+    if rows is None:
+        rows = {}
+
     if is_mapping(rows):
         rows = [rows]
+
     if returning is None:
         returning = not len(rows) > 1
 
@@ -53,13 +65,16 @@ def insert(s, table, rows, upsert_on=None, returning=None):
 
     keys = [valid(k) for k in rows[0].keys()]
 
-    colspec = ", ".join([f'"{k}"' for k in keys])
-    valuespec = ", ".join(":{}".format(k) for k in keys)
-
-    q = INSERT.format(table=table, colspec=colspec, valuespec=valuespec)
+    if keys:
+        colspec = ", ".join([f'"{k}"' for k in keys])
+        valuespec = ", ".join(":{}".format(k) for k in keys)
+        q = INSERT.format(table=table, colspec=colspec, valuespec=valuespec)
+    else:
+        q = INSERT_DEFAULT.format(table=table)
 
     if upsert_on:
         upsert_keys = list(keys)
+
         for k in upsert_on:
             upsert_keys.remove(k)
 

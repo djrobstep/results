@@ -28,7 +28,7 @@ isort = "*"
 pyyaml = "*"
 flake8 = "*"
 pytest-cov = "*"
-black = {python=">3.6", version=">=18.9b0", allow_prereleases=true}
+black = ">=19.10b0"
 pgnotify = "*"
 
 [tool.poetry.extras]
