@@ -51,17 +51,15 @@ def valid(key):
 
 
 def insert(s, table, rows, upsert_on=None, returning=None):
-    if rows is None:
-        rows = {}
 
     if is_mapping(rows):
         rows = [rows]
 
-    if returning is None:
-        returning = not len(rows) > 1
-
     if not rows:
         raise ValueError("empty list of rows, nothing to upsert")
+
+    if returning is None:
+        returning = not len(rows) > 1
 
     keys = [valid(k) for k in rows[0].keys()]
 

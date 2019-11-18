@@ -138,9 +138,12 @@ def test_db(tmpdb):
     assert len(unique_y) == 1
     assert unique_y.scalar() == "a"
 
-    defaults = other.insert("t", None)
+    defaults = other.insert("t", {})
 
     assert defaults.one() == dict(x=None, y=None)
+
+    with raises(ValueError):
+        other.insert("t", None)
 
 
 def test_pg_notify(tmpdb):
