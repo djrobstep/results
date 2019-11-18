@@ -115,12 +115,12 @@ def sync_db_structure_to_target_db(
     db_url, target_db_url, confirm=True, create_extensions_only=False, **kwargs
 ):
     log.info(f"syncing: {db_url} to {target_db_url}")
+
     with S(db_url, poolclass=NullPool) as s_current, S(
         target_db_url, poolclass=NullPool
     ) as s_target:
         m = Migration(s_current, s_target, **kwargs)
         m.set_safety(False)
-
         if create_extensions_only:
             log.info("Syncing extension creation only...")
             m.add_extension_changes(creates=True, drops=False)
@@ -135,6 +135,7 @@ def sync_db_structure_to_target_db(
             if not confirm or prompt("Apply these changes?"):
                 log.info("Applying...")
                 m.apply()
+                log.info("Applied.")
             else:
                 if confirm:  # pragma: no cover
                     print("Not applying.")
@@ -142,9 +143,9 @@ def sync_db_structure_to_target_db(
             if confirm:  # pragma: no cover
                 print("Already synced.")
 
-        current_schema_hash = schema_hash(db_url)
-        if confirm:  # pragma: no cover
-            print(f"Schema hash: {current_schema_hash}")
+    current_schema_hash = schema_hash(db_url)
+    if confirm:  # pragma: no cover
+        print(f"Schema hash: {current_schema_hash}")
 
 
 def sync_db_structure_to_setup_method(
