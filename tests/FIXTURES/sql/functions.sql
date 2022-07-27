@@ -1,12 +1,13 @@
-
-CREATE or replace FUNCTION films_f(d date,
-def_t text default null,
-def_d date default '2014-01-01'::date)
+-- function which takes one positional arg and two named args with defaults
+CREATE or replace FUNCTION films_f(title text,
+    is_feature boolean default true,
+    duration integer default 180)
 RETURNS TABLE(
     title character varying,
-    release_date date
+    is_feature boolean,
+    duration integer
 )
-as $$select 'a'::varchar, '2014-01-01'::date$$
+as $$select title, is_feature, duration$$
 language sql;
 
 CREATE OR REPLACE FUNCTION inc_f(integer) RETURNS integer AS $$

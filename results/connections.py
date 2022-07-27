@@ -15,10 +15,11 @@ from .resultset import resultproxy_to_results
 def build_proc_call_query(_proc_name, *args, **kwargs):
     _proc_name = _proc_name.replace("__", ".")
     params = {f"positional{i}": x for i, x in enumerate(args)}
-    params.update(**dict(kwargs))
     paramnames = params.keys()
     bindparams = [f":{name}" for name in list(paramnames)]
+    bindparams.extend([f"{key} => :{key}" for key in dict(kwargs).keys()])
     paramspec = ", ".join(bindparams)
+    params.update(**dict(kwargs))
     query = f"select * from {_proc_name}({paramspec})"
     return query, params
 

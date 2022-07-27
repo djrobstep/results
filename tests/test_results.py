@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from pytest import raises
+from sqlalchemy.exc import ProgrammingError
 
 import results
 from results import db
@@ -52,6 +53,25 @@ def test_function_calls(tmpdbwithfunctions):
     with tmpdb.transaction() as t:
         result = t.procs.inc_f(1)
         assert result.scalar() == 2
+
+
+def test_function_calls_with_default_args(tmpdbwithfunctions):
+    tmpdb = db(tmpdbwithfunctions)
+
+    def callfunc(*args, **kwargs):
+        return list(tmpdb.procs.films_f(*args, **kwargs).one().values())
+
+    with raises(ProgrammingError):
+        callfunc()
+
+    # providing only 1 arg returns 2 defaults
+    assert callfunc("test") == ["test", True, 180]
+    # providing all args as positional returns provided values
+    assert callfunc("test", False, 99) == ["test", False, 99]
+    # providing combo of positional and named args works
+    assert callfunc("test", is_feature=False, duration=99) == ["test", False, 99]
+    # omitting one named parameter returns default and still accepts the other
+    assert callfunc("test", duration=99) == ["test", True, 99]
 
 
 def test_result_object(tmpdir, sample):
