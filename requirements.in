@@ -1,0 +1,2 @@
+psycopg[pool]
+click

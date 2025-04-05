@@ -1,0 +1,23 @@
+
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "results"
+dynamic = ["version", "dependencies"]
+
+
+[project.scripts]
+results = "results.command:cli"
+
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.in"] }
+version = {attr = "results.__version__"}
+
+
+[tool.setuptools.package-data]
+"*" = ["*.sql"]

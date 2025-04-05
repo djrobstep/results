@@ -1,0 +1,51 @@
+*.py[cod]
+
+# C extensions
+*.so
+
+# Packages
+*.egg
+*.egg-info
+dist
+build
+eggs
+parts
+bin
+var
+sdist
+develop-eggs
+.installed.cfg
+lib
+lib64
+__pycache__
+wheelhouse
+
+# Installer logs
+pip-log.txt
+
+# Unit test / coverage reports
+.coverage*
+.tox
+nosetests.xml
+.pytest_cache
+
+# Translations
+*.mo
+
+# Mr Developer
+.mr.developer.cfg
+.project
+.pydevproject
+
+.cache
+
+docs/site
+
+scratch
+pip-wheel-metadata
+.DS_Store
+.*_cache
+.python-version
+
+*.schema.sql
+*.results.yaml
