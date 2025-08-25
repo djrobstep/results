@@ -101,15 +101,15 @@ The command line version should work much the same as `migra` did, with a couple
 
 To get the schema diff from database `a` to database `b`:
 
-    `migra postgresql:///a postgresql:///b`
+    migra postgresql:///a postgresql:///b
 
 becomes:
 
-    `results dbdiff postgresql:///a postgresql:///b`
+    results dbdiff postgresql:///a postgresql:///b
 
 One differences is that you can now just specify a database name (rather than full connection url) for local dbs. So the above can just be:
 
-    `results dbdiff a b`
+    results dbdiff a b
 
 `migra` also used to fail if any drop statements were generated unless you added the `--unsafe` flag. I've decided that was more trouble than it was worth, so I've removed it. 
 
