@@ -99,15 +99,11 @@ print(diff)
 
 The command line version should work much the same as `migra` did, with a couple of small differences/enhancements.
 
-To get the schema diff from database `a` to database `b`:
-
-    migra postgresql:///a postgresql:///b
-
-becomes:
+To get the schema diff from database `a` to database `b` (formerly `migra postgresql:///a postgresql:///b`):
 
     results dbdiff postgresql:///a postgresql:///b
 
-One differences is that you can now just specify a database name (rather than full connection url) for local dbs. So the above can just be:
+One difference is that you can now just specify a database name (rather than full connection url) for local dbs. So the above can just be:
 
     results dbdiff a b
 
