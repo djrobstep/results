@@ -4,7 +4,6 @@ from copy import deepcopy
 from dataclasses import make_dataclass
 
 from .formatting import format_table_of_dicts
-from .typeguess import guess_sql_type_of_values
 
 
 def rando(length=10) -> str:
@@ -85,6 +84,8 @@ class Rows(list):
 
     @property
     def guessed_sql_columns(self):
+        from .typeguess import guess_sql_type_of_values
+
         return {k: guess_sql_type_of_values(self[k]) for k in self.column_info}
 
     @classmethod
