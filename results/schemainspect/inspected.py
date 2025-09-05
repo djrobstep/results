@@ -291,6 +291,7 @@ class InspectedSelectable(Inspected):
         rowsecurity=False,
         forcerowsecurity=False,
         persistence=None,
+        options=None,
         oid=None,
     ):
         self.name = name
@@ -311,6 +312,7 @@ class InspectedSelectable(Inspected):
         self.rowsecurity = rowsecurity
         self.forcerowsecurity = forcerowsecurity
         self.persistence = persistence
+        self.options = options
         self.oid = oid
 
     def __eq__(self, other):
@@ -326,5 +328,6 @@ class InspectedSelectable(Inspected):
             self.partition_def == other.partition_def,
             self.rowsecurity == other.rowsecurity,
             self.persistence == other.persistence,
+            self.options == other.options,
         )
         return all(equalities)
