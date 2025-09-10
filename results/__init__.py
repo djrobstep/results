@@ -7,4 +7,4 @@ from .tempdb import temporary_local_db
 
 from .urls import URL, url
 
-__version__ = "1.3.0"
+__version__ = "1.3.2"

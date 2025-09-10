@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from inspect import currentframe
 from pathlib import Path
 from threading import get_ident
+import multiprocessing
 
 from psycopg import connect as pgconnect
 from psycopg_pool import ConnectionPool
@@ -34,16 +35,44 @@ def connection_check(conn):
         curs.execute("SELECT 1")
 
 
+def reconnect_failed(connection_pool, **kwargs):
+    connection_pool.queue.put("failed")
+
+
 @contextmanager
 def pooled_connection(db_url):
     if db_url not in conns:
-        conns[db_url] = ConnectionPool(
-            db_url, min_size=1, max_size=1024, open=True, check=connection_check
+
+        def configure_check(connection, **kwargs):
+            pool.queue.put("ok")
+
+        pool = ConnectionPool(
+            db_url,
+            min_size=1,
+            max_size=1024,
+            open=False,
+            configure=configure_check,
+            check=connection_check,
+            reconnect_timeout=0,
+            reconnect_failed=reconnect_failed,
         )
 
-    pool = conns[db_url]
+        queue = multiprocessing.Queue()
 
-    with pool.connection(timeout=0.1) as conn:
+        pool.queue = queue
+
+        pool.open()
+
+        conns[db_url] = pool
+        result = pool.queue.get()
+
+        if result != "ok":
+            raise ValueError("Connection failed")
+
+    else:
+        pool = conns[db_url]
+
+    with pool.connection() as conn:
         yield conn
 
 
