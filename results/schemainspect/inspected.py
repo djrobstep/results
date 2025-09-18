@@ -278,6 +278,7 @@ class InspectedSelectable(Inspected):
     def __init__(
         self,
         name,
+        rel_options,
         schema,
         columns,
         inputs=None,
@@ -294,6 +295,7 @@ class InspectedSelectable(Inspected):
         oid=None,
     ):
         self.name = name
+        self.rel_options = rel_options
         self.schema = schema
         self.inputs = inputs or []
         self.columns = columns

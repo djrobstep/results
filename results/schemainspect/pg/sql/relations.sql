@@ -22,6 +22,7 @@ r as (
         c.relname as name,
         n.nspname as schema,
         c.relkind as relationtype,
+        c.reloptions as reloptions,
         c.oid as oid,
         case when c.relkind in ('m', 'v') then
           pg_get_viewdef(c.oid)
@@ -70,6 +71,7 @@ select
     r.relationtype,
     r.schema,
     r.name,
+    r.reloptions,
     r.definition as definition,
     a.attnum as position_number,
     a.attname as attname,
