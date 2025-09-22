@@ -113,8 +113,10 @@ class InspectedSelectable(BaseInspectedSelectable):
                     self.persistence_modifier, n, self.parent_table, self.partition_def
                 )
         elif self.relationtype == "v":
-            with_options = "with ({})".format(", ".join(self.options)) if self.options else ""
-            create_statement = "create or replace view {} {} as {}\n".format(
+            with_options = (
+                " with ({})".format(", ".join(self.options)) if self.options else ""
+            )
+            create_statement = "create or replace view {}{} as {}\n".format(
                 n, with_options, self.definition
             )
         elif self.relationtype == "m":
@@ -1509,6 +1511,7 @@ class PostgreSQL:
         for x in (self.tables, self.views, self.materialized_views):
             self.relations.update(x)
         q = self.execute(self.INDEXES_QUERY)
+
         indexlist = [
             InspectedIndex(
                 name=i.name,
