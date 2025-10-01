@@ -68,6 +68,6 @@ WHERE
 )
 select * ,
 index_columns[1\:key_column_count] as key_columns,
-index_columns[key_column_count+1\:array_length(index_columns, 1)] as included_columns
+coalesce((select array_agg(col) from unnest(index_columns) with ordinality as t(col, pos) where pos > key_column_count), array[]::name[]) as included_columns
 from pre
 order by 1, 2, 3;
