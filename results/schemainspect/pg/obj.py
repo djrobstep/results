@@ -323,7 +323,22 @@ class InspectedFunction(InspectedSelectable):
             and self.strictness == other.strictness
             and self.security_type == other.security_type
             and self.kind == other.kind
+            and self.comment == other.comment
         )
+
+    @property
+    def comment_statement(self):
+        """Generate a COMMENT ON statement for this function."""
+        if self.comment is None:
+            return None
+
+        escaped_comment = self.comment.replace("'", "''")
+        return f"COMMENT ON FUNCTION {self.signature} IS '{escaped_comment}';"
+
+    @property
+    def drop_comment_statement(self):
+        """Generate a statement to drop the comment for this function."""
+        return f"COMMENT ON FUNCTION {self.signature} IS NULL;"
 
 
 class InspectedTrigger(Inspected):
@@ -688,10 +703,11 @@ class InspectedSchema(Inspected):
 
 
 class InspectedType(Inspected):
-    def __init__(self, name, schema, columns):
+    def __init__(self, name, schema, columns, comment=None):
         self.name = name
         self.schema = schema
         self.columns = columns
+        self.comment = comment
 
     @property
     def drop_statement(self):
@@ -716,7 +732,22 @@ class InspectedType(Inspected):
             self.schema == other.schema
             and self.name == other.name
             and self.columns == other.columns
+            and self.comment == other.comment
         )
+
+    @property
+    def comment_statement(self):
+        """Generate a COMMENT ON statement for this type."""
+        if self.comment is None:
+            return None
+
+        escaped_comment = self.comment.replace("'", "''")
+        return f"COMMENT ON TYPE {self.signature} IS '{escaped_comment}';"
+
+    @property
+    def drop_comment_statement(self):
+        """Generate a statement to drop the comment for this type."""
+        return f"COMMENT ON TYPE {self.signature} IS NULL;"
 
 
 class InspectedDomain(Inspected):
@@ -1695,7 +1726,10 @@ class PostgreSQL:
             return defn["attribute"], defn["type"]
 
         types = [
-            InspectedType(i.name, i.schema, dict(col(_) for _ in i.columns)) for i in q
+            InspectedType(
+                i.name, i.schema, dict(col(_) for _ in i.columns), comment=i.comment
+            )
+            for i in q
         ]  # type: list[InspectedType]
         self.types = od((t.signature, t) for t in types)
 

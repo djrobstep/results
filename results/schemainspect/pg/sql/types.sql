@@ -20,7 +20,7 @@ SELECT
   --       WHERE e.enumtypid = t.oid
   --       ORDER BY e.oid ), E'\n'
   --   ) AS columns,
-  pg_catalog.obj_description (t.oid, 'pg_type') AS description,
+  pg_catalog.obj_description (t.oid, 'pg_type') AS comment,
   (array_to_json(array(
     select
       jsonb_build_object('attribute', attname, 'type', a.typname)

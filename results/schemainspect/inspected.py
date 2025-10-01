@@ -329,5 +329,88 @@ class InspectedSelectable(Inspected):
             self.rowsecurity == other.rowsecurity,
             self.persistence == other.persistence,
             self.options == other.options,
+            self.comment == other.comment,
         )
         return all(equalities)
+
+    @property
+    def comment_statement(self):
+        """Generate a COMMENT ON statement for this object."""
+        if self.comment is None:
+            return None
+
+        # Determine the object type based on relationtype
+        object_type_map = {
+            "r": "TABLE",
+            "p": "TABLE",  # partitioned table
+            "v": "VIEW",
+            "m": "MATERIALIZED VIEW",
+            "c": "TYPE",  # composite type
+            "f": "FUNCTION",  # this is handled separately in InspectedFunction
+        }
+
+        object_type = object_type_map.get(self.relationtype, "TABLE")
+        escaped_comment = self.comment.replace("'", "''")
+
+        return (
+            f"COMMENT ON {object_type} {self.quoted_full_name} IS '{escaped_comment}';"
+        )
+
+    @property
+    def drop_comment_statement(self):
+        """Generate a statement to drop the comment for this object."""
+        object_type_map = {
+            "r": "TABLE",
+            "p": "TABLE",  # partitioned table
+            "v": "VIEW",
+            "m": "MATERIALIZED VIEW",
+            "c": "TYPE",  # composite type
+            "f": "FUNCTION",  # this is handled separately in InspectedFunction
+        }
+
+        object_type = object_type_map.get(self.relationtype, "TABLE")
+        return f"COMMENT ON {object_type} {self.quoted_full_name} IS NULL;"
+
+    def comment_alter_statements(self, other):
+        """Generate statements to alter comments between two versions."""
+        statements = []
+
+        if self.comment != other.comment:
+            if self.comment is None:
+                # Adding a comment
+                if other.comment is not None:
+                    object_type_map = {
+                        "r": "TABLE",
+                        "p": "TABLE",  # partitioned table
+                        "v": "VIEW",
+                        "m": "MATERIALIZED VIEW",
+                        "c": "TYPE",  # composite type
+                        "f": "FUNCTION",  # this is handled separately in InspectedFunction
+                    }
+
+                    object_type = object_type_map.get(other.relationtype, "TABLE")
+                    escaped_comment = other.comment.replace("'", "''")
+                    statements.append(
+                        f"COMMENT ON {object_type} {other.quoted_full_name} IS '{escaped_comment}';"
+                    )
+            elif other.comment is None:
+                # Removing a comment
+                statements.append(self.drop_comment_statement)
+            else:
+                # Changing a comment
+                object_type_map = {
+                    "r": "TABLE",
+                    "p": "TABLE",  # partitioned table
+                    "v": "VIEW",
+                    "m": "MATERIALIZED VIEW",
+                    "c": "TYPE",  # composite type
+                    "f": "FUNCTION",  # this is handled separately in InspectedFunction
+                }
+
+                object_type = object_type_map.get(other.relationtype, "TABLE")
+                escaped_comment = other.comment.replace("'", "''")
+                statements.append(
+                    f"COMMENT ON {object_type} {other.quoted_full_name} IS '{escaped_comment}';"
+                )
+
+        return statements
