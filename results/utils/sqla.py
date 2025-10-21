@@ -24,7 +24,13 @@ def S(url):
     # Create an Engine, which the Session will use for connection resources
     engine = create_engine(url)
 
-    # Create session and add objects
-    with Session(engine) as session:
-        yield SqlaSession(session)
-        session.commit()
+    try:
+        # Create session and add objects
+        with Session(engine) as session:
+            yield SqlaSession(session)
+            session.commit()
+    finally:
+        # Dispose of the engine to close all connections in the pool
+        # This prevents "server closed the connection unexpectedly" errors
+        # when temporary databases are dropped
+        engine.dispose()

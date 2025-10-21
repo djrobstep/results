@@ -80,8 +80,6 @@ def statements_from_differences(
     drop_and_recreate = modifications and not modifications_as_alters
     alters = modifications and modifications_as_alters
 
-
-
     if drops:
         pending_drops |= set(removed)
         # When drops_only=True AND modifications is intended (modifications param is True),
@@ -109,10 +107,12 @@ def statements_from_differences(
         if creations:
             pending_creations |= set(modified)
 
-
-
     # ALTER logic should only run in modifications_only mode or normal mode (not drops_only/creations_only)
-    if alters and not (drops_only and not modifications_only) and not (creations_only and not modifications_only):
+    if (
+        alters
+        and not (drops_only and not modifications_only)
+        and not (creations_only and not modifications_only)
+    ):
         for k, v in modified.items():
             statements += v.alter_statements(old[k])
 
@@ -354,7 +354,11 @@ def get_table_changes(
             statements.append(rls_alter)
 
         # Handle comment changes
-        if hasattr(v, 'comment') and hasattr(before, 'comment') and v.comment != before.comment:
+        if (
+            hasattr(v, "comment")
+            and hasattr(before, "comment")
+            and v.comment != before.comment
+        ):
             comment_statements = v.alter_statements(before)
             statements += comment_statements
 
@@ -525,15 +529,15 @@ def get_selectable_changes(
 
     def functions(d):
         return {k: v for k, v in d.items() if v.relationtype == "f"}
-    
+
     def non_composite_types(d):
-        return {k: v for k, v in d.items() if getattr(v, 'relationtype', None) != "c"}
+        return {k: v for k, v in d.items() if getattr(v, "relationtype", None) != "c"}
 
     # Filter out composite types since they are handled separately by the types() method
     added_other = non_composite_types(added_other)
-    removed_other = non_composite_types(removed_other) 
+    removed_other = non_composite_types(removed_other)
     modified_other = non_composite_types(modified_other)
-    
+
     if not tables_only:
         if not creations_only:
             statements += statements_from_differences(
@@ -570,7 +574,7 @@ def get_selectable_changes(
                 dependency_ordering=True,
                 old=selectables_from,
             )
-            
+
             # Add COMMENT statements for created/modified non-table selectables
             # Note: comment_alter_statements(other) generates statements to transform FROM self TO other
             # So we call old.comment_alter_statements(new) to go from old to new
@@ -594,7 +598,7 @@ def get_selectable_changes(
                 if k in selectables_from:
                     old_obj = selectables_from[k]
                     statements += old_obj.comment_alter_statements(v)
-                    
+
     return statements
 
 
@@ -619,7 +623,7 @@ class Changes(object):
                 modifications_as_alters=True,
             )
 
-    @property 
+    @property
     def types(self):
         return partial(
             statements_for_changes,
@@ -680,7 +684,7 @@ class Changes(object):
             creations_only=True,
             non_tables_only=True,
         )
-    
+
     @property
     def non_pk_constraints(self):
         a = self.i_from.constraints.items()

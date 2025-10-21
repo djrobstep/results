@@ -25,4 +25,9 @@ def temporary_local_db():
     try:
         yield temp_db
     finally:
+        # Close the connection pool for this database before dropping it
+        # This prevents "server closed the connection unexpectedly" errors
+        from results.database import close_pool
+
+        close_pool(temp_db.url)
         home_db.drop_db(db_name, yes_really_drop=True, force=True)

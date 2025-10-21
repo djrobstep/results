@@ -27,6 +27,18 @@ def pool_shutdown():
         pool.close()
 
 
+def close_pool(db_url):
+    """Close and remove the connection pool for a specific database URL.
+
+    This should be called before dropping a database to prevent
+    "server closed the connection unexpectedly" errors.
+    """
+    if db_url in conns:
+        pool = conns[db_url]
+        pool.close()
+        del conns[db_url]
+
+
 atexit.register(pool_shutdown)
 
 
