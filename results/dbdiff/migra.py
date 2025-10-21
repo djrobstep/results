@@ -77,6 +77,8 @@ class Migration:
         self.add(self.changes.extensions(modifications_only=True, modifications=True))
         self.add(self.changes.collations(creations_only=True))
         self.add(self.changes.enums(creations_only=True, modifications=False))
+        self.add(self.changes.types(creations_only=True))
+        self.add(self.changes.types(modifications_only=True))
         self.add(self.changes.sequences(creations_only=True))
         self.add(self.changes.triggers(drops_only=True))
         self.add(self.changes.rlspolicies(drops_only=True))
@@ -94,6 +96,7 @@ class Migration:
 
         self.add(self.changes.sequences(drops_only=True))
         self.add(self.changes.enums(drops_only=True, modifications=False))
+        self.add(self.changes.types(drops_only=True))
         self.add(self.changes.extensions(drops_only=True, modifications=False))
         self.add(self.changes.non_mv_indexes(creations_only=True))
         self.add(self.changes.pk_constraints(creations_only=True))

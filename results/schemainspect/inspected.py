@@ -414,3 +414,22 @@ class InspectedSelectable(Inspected):
                 )
 
         return statements
+
+    def only_comment_changed(self, other):
+        """Check if only the comment has changed between two versions of the same object."""
+        # Check all attributes except comment
+        equalities = (
+            type(self) == type(other),
+            self.relationtype == other.relationtype,
+            self.name == other.name,
+            self.schema == other.schema,
+            dict(self.columns) == dict(other.columns),
+            self.inputs == other.inputs,
+            self.definition == other.definition,
+            self.parent_table == other.parent_table,
+            self.partition_def == other.partition_def,
+            self.rowsecurity == other.rowsecurity,
+            self.persistence == other.persistence,
+            self.options == other.options,
+        )
+        return all(equalities) and self.comment != other.comment

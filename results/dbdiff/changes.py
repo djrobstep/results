@@ -19,6 +19,7 @@ THINGS = [
     "collations",
     "rlspolicies",
     "triggers",
+    "types",
 ]
 PK = "PRIMARY KEY"
 
@@ -79,20 +80,39 @@ def statements_from_differences(
     drop_and_recreate = modifications and not modifications_as_alters
     alters = modifications and modifications_as_alters
 
+
+
     if drops:
         pending_drops |= set(removed)
+        # When drops_only=True AND modifications is intended (modifications param is True),
+        # we need to drop modified items that can't be replaced
+        # (they will be recreated in a separate creations_only phase)
+        # But if modifications_as_alters=True, items should be ALTERed, not dropped
+        # And if modifications=False, items should also be ALTERed, not dropped
+        if drops_only and drop_and_recreate:
+            pending_drops |= set(modified) - replaceable
 
     if creations:
         pending_creations |= set(added)
+        # When creations_only=True AND modifications is intended,
+        # we need to recreate modified items (they were presumably dropped in a separate drops_only phase)
+        # But exclude replaceable items since they should use CREATE OR REPLACE instead
+        # And if modifications_as_alters=True, items should be ALTERed, not recreated
+        if creations_only and drop_and_recreate:
+            pending_creations |= set(modified) - replaceable
 
-    if drop_and_recreate:
+    # drop_and_recreate logic only applies when NOT in drops_only or creations_only mode
+    if drop_and_recreate and not drops_only and not creations_only:
         if drops:
             pending_drops |= set(modified) - replaceable
 
         if creations:
             pending_creations |= set(modified)
 
-    if alters:
+
+
+    # ALTER logic should only run in modifications_only mode or normal mode (not drops_only/creations_only)
+    if alters and not (drops_only and not modifications_only) and not (creations_only and not modifications_only):
         for k, v in modified.items():
             statements += v.alter_statements(old[k])
 
@@ -116,6 +136,13 @@ def statements_from_differences(
                     if k in pending_drops:
                         statements.append(old[k].drop_statement)
                         pending_drops.remove(k)
+            # When drops_only=True, also process modified items
+            if drops_only:
+                for k, v in modified.items():
+                    if not has_remaining_dependents(v, pending_drops):
+                        if k in pending_drops:
+                            statements.append(old[k].drop_statement)
+                            pending_drops.remove(k)
         if creations:
             for k, v in added.items():
                 if not has_uncreated_dependencies(v, pending_creations):
@@ -125,6 +152,22 @@ def statements_from_differences(
                         else:
                             statements.append(v.create_statement)
                         pending_creations.remove(k)
+            # When creations_only=True, also process modified items
+            if creations_only:
+                for k, v in modified.items():
+                    if not has_uncreated_dependencies(v, pending_creations):
+                        if k in pending_creations:
+                            if hasattr(v, "safer_create_statements"):
+                                statements += v.safer_create_statements
+                            else:
+                                statements.append(v.create_statement)
+                            pending_creations.remove(k)
+                        # Handle replaceable modified items (views, functions) - they use CREATE OR REPLACE
+                        elif k in replaceable:
+                            if hasattr(v, "safer_create_statements"):
+                                statements += v.safer_create_statements
+                            else:
+                                statements.append(v.create_statement)
         if modifications:
             for k, v in modified.items():
                 if drops:
@@ -310,6 +353,11 @@ def get_table_changes(
             rls_alter = v.alter_rls_statement
             statements.append(rls_alter)
 
+        # Handle comment changes
+        if hasattr(v, 'comment') and hasattr(before, 'comment') and v.comment != before.comment:
+            comment_statements = v.alter_statements(before)
+            statements += comment_statements
+
     seq_created, seq_dropped, seq_modified, _ = differences(
         sequences_from, sequences_target
     )
@@ -454,6 +502,7 @@ def get_selectable_changes(
     non_tables_only=False,
     drops_only=False,
     creations_only=False,
+    modifications_only=False,
 ):
     (
         tables_from,
@@ -476,7 +525,15 @@ def get_selectable_changes(
 
     def functions(d):
         return {k: v for k, v in d.items() if v.relationtype == "f"}
+    
+    def non_composite_types(d):
+        return {k: v for k, v in d.items() if getattr(v, 'relationtype', None) != "c"}
 
+    # Filter out composite types since they are handled separately by the types() method
+    added_other = non_composite_types(added_other)
+    removed_other = non_composite_types(removed_other) 
+    modified_other = non_composite_types(modified_other)
+    
     if not tables_only:
         if not creations_only:
             statements += statements_from_differences(
@@ -513,6 +570,31 @@ def get_selectable_changes(
                 dependency_ordering=True,
                 old=selectables_from,
             )
+            
+            # Add COMMENT statements for created/modified non-table selectables
+            # Note: comment_alter_statements(other) generates statements to transform FROM self TO other
+            # So we call old.comment_alter_statements(new) to go from old to new
+            for k, v in added_other.items():
+                if v.comment:
+                    # For added items, just generate the comment directly
+                    object_type_map = {
+                        "r": "TABLE",
+                        "p": "TABLE",
+                        "v": "VIEW",
+                        "m": "MATERIALIZED VIEW",
+                        "c": "TYPE",
+                        "f": "FUNCTION",
+                    }
+                    object_type = object_type_map.get(v.relationtype, "TABLE")
+                    escaped_comment = v.comment.replace("'", "''")
+                    statements.append(
+                        f"COMMENT ON {object_type} {v.quoted_full_name} IS '{escaped_comment}';"
+                    )
+            for k, v in modified_other.items():
+                if k in selectables_from:
+                    old_obj = selectables_from[k]
+                    statements += old_obj.comment_alter_statements(v)
+                    
     return statements
 
 
@@ -536,6 +618,15 @@ class Changes(object):
                 self.i_target.extensions,
                 modifications_as_alters=True,
             )
+
+    @property 
+    def types(self):
+        return partial(
+            statements_for_changes,
+            self.i_from.types,
+            self.i_target.types,
+            modifications_as_alters=True,
+        )
 
     @property
     def selectables(self):
@@ -589,7 +680,7 @@ class Changes(object):
             creations_only=True,
             non_tables_only=True,
         )
-
+    
     @property
     def non_pk_constraints(self):
         a = self.i_from.constraints.items()

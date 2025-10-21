@@ -240,6 +240,10 @@ class InspectedSelectable(BaseInspectedSelectable):
         keyword = "unlogged" if self.is_unlogged else "logged"
         return self.alter_table_statement("set {}".format(keyword))
 
+    def alter_statements(self, other):
+        """Generate ALTER statements to transform the other object to match this one."""
+        return other.comment_alter_statements(self)
+
 
 class InspectedFunction(InspectedSelectable):
     def __init__(
@@ -748,6 +752,35 @@ class InspectedType(Inspected):
     def drop_comment_statement(self):
         """Generate a statement to drop the comment for this type."""
         return f"COMMENT ON TYPE {self.signature} IS NULL;"
+
+    def comment_alter_statements(self, other):
+        """Generate statements to alter comments between two types."""
+        statements = []
+
+        if self.comment != other.comment:
+            if other.comment:
+                # Adding or changing a comment
+                escaped_comment = other.comment.replace("'", "''")
+                statements.append(
+                    f"COMMENT ON TYPE {other.signature} IS '{escaped_comment}';"
+                )
+            else:
+                # Removing a comment
+                statements.append(self.drop_comment_statement)
+
+        return statements
+
+    def alter_statements(self, other):
+        """Generate ALTER statements to transform the other type to match this one."""
+        return other.comment_alter_statements(self)
+
+    @property
+    def safer_create_statements(self):
+        """Generate both CREATE and COMMENT statements for type creation."""
+        statements = [self.create_statement]
+        if self.comment:
+            statements.append(self.comment_statement)
+        return statements
 
 
 class InspectedDomain(Inspected):
