@@ -12,7 +12,8 @@ select
   collctype as lc_ctype,
   collversion as version,
   -- 17_AND_LATER colllocale as locale
-  -- 16_AND_EARLIER colliculocale as locale
+  -- 15_AND_16 colliculocale as locale
+  -- 14_AND_EARLIER collcollate as locale
 from
 pg_collation c
 INNER JOIN pg_namespace n

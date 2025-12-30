@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from string import ascii_lowercase, digits
 
 from .rows import Rows
 from .syntax import quoted_identifier as qi
@@ -38,7 +39,6 @@ INSERT_UPSERT_DO_NOTHING = """
     do nothing
 """
 
-from string import ascii_lowercase, digits
 
 ALLOWED = set(ascii_lowercase + digits + "_")
 LOWERCASE = set(ascii_lowercase)

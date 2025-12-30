@@ -24,7 +24,8 @@ r as (
         c.relkind as relationtype,
         c.oid as oid,
         case when c.relkind in ('m', 'v') then
-          pg_get_viewdef(c.oid)
+          -- 15_AND_LATER pg_get_viewdef(c.oid, 0)
+          -- 14_AND_EARLIER pg_get_viewdef(c.oid)
         else null end
           as definition,
         (SELECT

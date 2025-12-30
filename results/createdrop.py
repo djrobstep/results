@@ -1,12 +1,11 @@
 # from psycopg2.errors import DuplicateDatabase, InvalidCatalogName
+import psycopg.errors
 
 from .psyco import quoted_identifier as qi
 
 NO_YES_REALLY = (
     "You tried to drop a database without setting `yes_really_drop` to true."
 )
-
-import psycopg.errors
 
 
 class DatabaseCreateDrop:

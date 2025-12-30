@@ -317,7 +317,7 @@ class InspectedSelectable(Inspected):
 
     def __eq__(self, other):
         equalities = (
-            type(self) == type(other),
+            type(self) is type(other),
             self.relationtype == other.relationtype,
             self.name == other.name,
             self.schema == other.schema,
@@ -419,7 +419,7 @@ class InspectedSelectable(Inspected):
         """Check if only the comment has changed between two versions of the same object."""
         # Check all attributes except comment
         equalities = (
-            type(self) == type(other),
+            type(self) is type(other),
             self.relationtype == other.relationtype,
             self.name == other.name,
             self.schema == other.schema,

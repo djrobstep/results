@@ -344,6 +344,23 @@ class InspectedFunction(InspectedSelectable):
         """Generate a statement to drop the comment for this function."""
         return f"COMMENT ON FUNCTION {self.signature} IS NULL;"
 
+    def comment_alter_statements(self, other):
+        """Generate statements to alter comments between two functions."""
+        statements = []
+
+        if self.comment != other.comment:
+            if other.comment:
+                # Adding or changing a comment
+                escaped_comment = other.comment.replace("'", "''")
+                statements.append(
+                    f"COMMENT ON FUNCTION {other.signature} IS '{escaped_comment}';"
+                )
+            else:
+                # Removing a comment
+                statements.append(self.drop_comment_statement)
+
+        return statements
+
 
 class InspectedTrigger(Inspected):
     def __init__(
@@ -1199,6 +1216,9 @@ class PostgreSQL:
             else:
                 q = q.replace("-- 16_AND_EARLIER", "")
 
+            if 15 <= self.pg_version <= 16:
+                q = q.replace("-- 15_AND_16", "")
+
             q = q.replace("-- EXTOIDS", self.EXTOIDS_QUERY)
 
             if self.connection_type == "sqlalchemy":
@@ -1242,7 +1262,7 @@ class PostgreSQL:
     def execute(self, *args, **kwargs):
         if not self.connection_type == "sqlalchemy":
             # breakpoint()
-            result = self.c.execute(*args, **kwargs)
+            self.c.execute(*args, **kwargs)
 
             # if result is None:
             rows = self.c.fetchall()
@@ -1661,7 +1681,7 @@ class PostgreSQL:
 
             try:
                 self.relations[t].indexes[n] = each
-            except:
+            except Exception:
                 pass
         for each in self.constraints.values():
             t = each.quoted_full_table_name

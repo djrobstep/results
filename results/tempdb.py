@@ -15,11 +15,11 @@ def random_name(prefix):
 
 
 @contextmanager
-def temporary_local_db():
+def temporary_local_db(url=None):
     """Create a temporary local database that is automatically cleaned up."""
     db_name = random_name("tempdb-pg").replace("-", "_")
 
-    home_db = results.db()
+    home_db = results.db(url)
     temp_db = home_db.create_db(db_name)
 
     try:
