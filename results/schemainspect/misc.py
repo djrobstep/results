@@ -69,15 +69,26 @@ def quoted_identifier(identifier, schema=None, identity_arguments=None):
     return s
 
 
-def external_caller():
-    i = inspect.stack()
-    names = (inspect.getmodule(i[x][0]).__name__ for x in range(len(i)))
-    return next(name for name in names if name != __name__)
+def external_caller_package():
+    """Get the package name of the external caller.
+
+    Returns the __package__ of the calling module, which is needed for
+    importlib.resources.files() compatibility with Python < 3.12.
+    In Python 3.11 and earlier, files() requires a package, not a module.
+    """
+    for frame_info in inspect.stack():
+        module = inspect.getmodule(frame_info[0])
+        if module is not None and module.__name__ != __name__:
+            # Return the package, not the module name
+            # For a module like 'results.schemainspect.pg.obj',
+            # __package__ is 'results.schemainspect.pg'
+            return module.__package__ or module.__name__
+    return __name__  # pragma: no cover
 
 
 def resource_stream(subpath):
-    module_name = external_caller()
-    return files(module_name).joinpath(subpath).open()
+    package_name = external_caller_package()
+    return files(package_name).joinpath(subpath).open()
 
 
 def resource_text(subpath):
