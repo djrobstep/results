@@ -1,12 +1,33 @@
 # Don't get mad, get `results`
 
-`results` is a database library with a focus on postgres. 
+`results` is a database library with a focus on postgres.
 
 It does a bunch of different things, but the part you are most likely interested in is the database diffing functionality, which I originally built as `migra`, and whose legend now continues in this project.
 
 Most of this library is in alpha state. I'll continue to change it willy-nilly and move things around with not a care in the world. However the db diffing part I'll aim to keep relatively stable, except between major versions, given it has already reached a certain level of maturity.
 
 Some slightly better docs forthcoming, but for now, here's a brief rundown, scroll to the bottom for the `migra` part.
+
+
+## Installation
+
+Install from PyPI:
+
+```bash
+pip install results
+```
+
+This installs the `results` command-line tool and Python library. No additional packages are needed for the database diffing functionality - it's all included.
+
+Requirements:
+- Python 3.9+
+- PostgreSQL (for the database you're connecting to)
+
+**Coming from migra?** Skip to [Schema diffing/migration generation](#schema-diffingmigration-generation) below, or just run:
+
+```bash
+results dbdiff postgresql:///db_a postgresql:///db_b
+```
 
 
 ## Contributing
