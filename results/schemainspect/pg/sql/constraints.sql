@@ -126,7 +126,8 @@ select
     else null end as fk_columns_foreign,
     contype = 'f' as is_fk,
     condeferrable as is_deferrable,
-    condeferred as initially_deferred
+    condeferred as initially_deferred,
+    NOT convalidated as is_not_valid
 from
     pg_constraint
     INNER JOIN pg_class

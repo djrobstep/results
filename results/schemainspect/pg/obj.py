@@ -945,6 +945,7 @@ class InspectedConstraint(Inspected, TableRelated):
         is_fk=False,
         is_deferrable=False,
         initially_deferred=False,
+        is_not_valid=False,
     ):
         self.name = name
         self.schema = schema
@@ -960,6 +961,7 @@ class InspectedConstraint(Inspected, TableRelated):
 
         self.is_deferrable = is_deferrable
         self.initially_deferred = initially_deferred
+        self.is_not_valid = is_not_valid
 
     @property
     def drop_statement(self):
@@ -994,7 +996,8 @@ class InspectedConstraint(Inspected, TableRelated):
         else:
             using_clause = self.definition
 
-            if set_not_valid:
+            # Only append NOT VALID if requested and not already NOT VALID
+            if set_not_valid and not self.is_not_valid:
                 using_clause += " not valid"
 
         USING = "alter table {} add constraint {} {};"
@@ -1014,6 +1017,10 @@ class InspectedConstraint(Inspected, TableRelated):
     @property
     def safer_create_statements(self):
         if not self.can_use_not_valid:
+            return [self.create_statement]
+
+        # If constraint is defined as NOT VALID, respect that and don't validate
+        if self.is_not_valid:
             return [self.create_statement]
 
         return [self.get_create_statement(set_not_valid=True), self.validate_statement]
@@ -1648,6 +1655,7 @@ class PostgreSQL:
                 is_fk=i.is_fk,
                 is_deferrable=i.is_deferrable,
                 initially_deferred=i.initially_deferred,
+                is_not_valid=i.is_not_valid,
             )
             if constraint.index:
                 index_name = quoted_identifier(constraint.index, schema=i.schema)
