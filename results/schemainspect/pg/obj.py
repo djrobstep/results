@@ -1553,6 +1553,7 @@ class PostgreSQL:
                     is_identity_always=c.is_identity_always,
                     is_generated=c.is_generated,
                     can_drop_generated=self.pg_version >= 13,
+                    can_set_expression=self.pg_version >= 17,
                 )
                 for c in clist
                 if c.position_number

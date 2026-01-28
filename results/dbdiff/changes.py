@@ -323,8 +323,25 @@ def get_table_changes(
                 generated_status_removed and c_before.can_drop_generated
             )
 
-            drop_and_recreate_required = inheritance_status_changed or (
-                generated_status_changed and not can_drop_generated
+            # Generated column expression changed - PostgreSQL doesn't allow
+            # ALTER COLUMN on generated columns (except DROP EXPRESSION on PG13+
+            # and SET EXPRESSION on PG17+).
+            generated_expression_changed = (
+                c.is_generated
+                and c_before.is_generated
+                and c.default != c_before.default
+            )
+
+            # PG 17+ can use SET EXPRESSION to modify generated column expressions
+            # in-place, preserving indexes and other dependent objects
+            can_use_set_expression = (
+                generated_expression_changed and c.can_set_expression
+            )
+
+            drop_and_recreate_required = (
+                inheritance_status_changed
+                or (generated_status_changed and not can_drop_generated)
+                or (generated_expression_changed and not can_use_set_expression)
             )
 
             if drop_and_recreate_required:
@@ -335,6 +352,13 @@ def get_table_changes(
 
                 if not c.is_inherited:
                     c_added[k] = c
+
+            elif can_use_set_expression:
+                # Use SET EXPRESSION instead of keeping in c_modified
+                # (which would generate invalid ALTER statements)
+                del c_modified[k]
+                alter = v.alter_table_statement(c.alter_set_expression_clause)
+                statements.append(alter)
 
             if generated_status_changed:
                 pass

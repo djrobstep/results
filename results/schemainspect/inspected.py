@@ -53,6 +53,7 @@ class ColumnInfo(AutoRepr):
         is_generated=False,
         is_inherited=False,
         can_drop_generated=False,
+        can_set_expression=False,
     ):
         self.name = name or ""
         self.dbtype = dbtype
@@ -68,6 +69,7 @@ class ColumnInfo(AutoRepr):
         self.is_generated = is_generated
         self.is_inherited = is_inherited
         self.can_drop_generated = can_drop_generated
+        self.can_set_expression = can_set_expression
 
     def __eq__(self, other):
         return (
@@ -229,6 +231,13 @@ class ColumnInfo(AutoRepr):
         else:
             alter = "alter column {} drop default".format(self.quoted_name)
         return alter
+
+    @property
+    def alter_set_expression_clause(self):
+        """Generate ALTER COLUMN ... SET EXPRESSION for PG 17+."""
+        return "alter column {} set expression as ({})".format(
+            self.quoted_name, self.default
+        )
 
     def alter_identity_clause(self, other):
         if self.is_identity:
