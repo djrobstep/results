@@ -369,9 +369,19 @@ def get_table_changes(
         for k, c in c_added.items():
             alter = v.alter_table_statement(c.add_column_clause)
             statements.append(alter)
+            if c.comment is not None:
+                statements.append(c.comment_statement(t))
         for k, c in c_modified.items():
             c_before = before.columns[k]
-            statements += c.alter_table_statements(c_before, t)
+            if c.only_comment_changed(c_before):
+                comment_stmt = c.comment_alter_statement(c_before, t)
+                if comment_stmt:
+                    statements.append(comment_stmt)
+            else:
+                statements += c.alter_table_statements(c_before, t)
+                comment_stmt = c.comment_alter_statement(c_before, t)
+                if comment_stmt:
+                    statements.append(comment_stmt)
 
         if v.rowsecurity != before.rowsecurity:
             rls_alter = v.alter_rls_statement

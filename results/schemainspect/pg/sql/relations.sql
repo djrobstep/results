@@ -90,6 +90,7 @@ select
     e.name as enum_name,
     e.schema as enum_schema,
     pg_catalog.obj_description(r.oid) as comment,
+    pg_catalog.col_description(r.oid, a.attnum) as column_comment,
     r.parent_table,
     r.partition_def,
     r.rowsecurity,

@@ -54,6 +54,7 @@ class ColumnInfo(AutoRepr):
         is_inherited=False,
         can_drop_generated=False,
         can_set_expression=False,
+        comment=None,
     ):
         self.name = name or ""
         self.dbtype = dbtype
@@ -70,6 +71,7 @@ class ColumnInfo(AutoRepr):
         self.is_inherited = is_inherited
         self.can_drop_generated = can_drop_generated
         self.can_set_expression = can_set_expression
+        self.comment = comment
 
     def __eq__(self, other):
         return (
@@ -84,6 +86,7 @@ class ColumnInfo(AutoRepr):
             and self.is_identity_always == other.is_identity_always
             and self.is_generated == other.is_generated
             and self.is_inherited == other.is_inherited
+            and self.comment == other.comment
         )
 
     def alter_clauses(self, other):
@@ -280,6 +283,43 @@ class ColumnInfo(AutoRepr):
             self.collation_subclause,
             self.quoted_name,
             self.dbtypestr,
+        )
+
+    def comment_statement(self, table_name):
+        """Generate COMMENT ON COLUMN statement."""
+        if self.comment is None:
+            return None
+        escaped = self.comment.replace("'", "''")
+        return f"COMMENT ON COLUMN {table_name}.{self.quoted_name} IS '{escaped}';"
+
+    def drop_comment_statement(self, table_name):
+        """Generate statement to drop column comment."""
+        return f"COMMENT ON COLUMN {table_name}.{self.quoted_name} IS NULL;"
+
+    def comment_alter_statement(self, other, table_name):
+        """Generate ALTER statement for comment change, or None if unchanged."""
+        if self.comment == other.comment:
+            return None
+        if self.comment is not None:
+            escaped = self.comment.replace("'", "''")
+            return f"COMMENT ON COLUMN {table_name}.{self.quoted_name} IS '{escaped}';"
+        return f"COMMENT ON COLUMN {table_name}.{self.quoted_name} IS NULL;"
+
+    def only_comment_changed(self, other):
+        """Check if only comment differs (no structural change)."""
+        return (
+            self.name == other.name
+            and self.dbtype == other.dbtype
+            and self.dbtypestr == other.dbtypestr
+            and self.default == other.default
+            and self.not_null == other.not_null
+            and self.enum == other.enum
+            and self.collation == other.collation
+            and self.is_identity == other.is_identity
+            and self.is_identity_always == other.is_identity_always
+            and self.is_generated == other.is_generated
+            and self.is_inherited == other.is_inherited
+            and self.comment != other.comment
         )
 
 
