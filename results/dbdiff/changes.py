@@ -273,6 +273,13 @@ def get_table_changes(
         if v.rowsecurity:
             rls_alter = v.alter_rls_statement
             statements.append(rls_alter)
+        # Add table comment for new tables
+        if v.comment is not None:
+            statements.append(v.comment_statement)
+        # Add column comments for new tables
+        for col in v.columns.values():
+            if col.comment is not None:
+                statements.append(col.comment_statement(t))
 
     statements += enums_post
 
@@ -283,6 +290,13 @@ def get_table_changes(
         if v.is_partitioned != before.is_partitioned:
             statements.append(v.drop_statement)
             statements.append(v.create_statement)
+            # Add table comment after recreate
+            if v.comment is not None:
+                statements.append(v.comment_statement)
+            # Add column comments after recreate
+            for col in v.columns.values():
+                if col.comment is not None:
+                    statements.append(col.comment_statement(t))
             continue
 
         if v.is_unlogged != before.is_unlogged:
