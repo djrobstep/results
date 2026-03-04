@@ -21,4 +21,4 @@ version = {attr = "results.__version__"}
 
 
 [tool.setuptools.package-data]
-"*" = ["*.sql"]
+"*" = ["*.sql", "py.typed"]

@@ -958,6 +958,8 @@ class InspectedConstraint(Inspected, TableRelated):
         self.quoted_full_foreign_table_name = None
         self.fk_columns_local = None
         self.fk_columns_foreign = None
+        self.fk_on_delete = None
+        self.fk_on_update = None
 
         self.is_deferrable = is_deferrable
         self.initially_deferred = initially_deferred
@@ -988,10 +990,45 @@ class InspectedConstraint(Inspected, TableRelated):
     def create_statement(self):
         return self.get_create_statement(set_not_valid=False)
 
+    def _fk_definition(self, set_not_valid=False):
+        """Reconstruct FK definition with schema-qualified REFERENCES.
+
+        pg_get_constraintdef() returns unqualified table references
+        (e.g. ``REFERENCES foo(id)``), which breaks when search_path
+        doesn't include the target schema.  Reconstruct the full
+        definition from the component parts instead.
+        """
+        local_cols = ", ".join(
+            quoted_identifier(c) for c in self.fk_columns_local
+        )
+        foreign_cols = ", ".join(
+            quoted_identifier(c) for c in self.fk_columns_foreign
+        )
+        parts = [
+            "FOREIGN KEY ({}) REFERENCES {}({})".format(
+                local_cols, self.quoted_full_foreign_table_name, foreign_cols
+            )
+        ]
+        if self.fk_on_delete and self.fk_on_delete != "NO ACTION":
+            parts.append("ON DELETE {}".format(self.fk_on_delete))
+        if self.fk_on_update and self.fk_on_update != "NO ACTION":
+            parts.append("ON UPDATE {}".format(self.fk_on_update))
+        if self.is_deferrable:
+            parts.append("DEFERRABLE")
+            if self.initially_deferred:
+                parts.append("INITIALLY DEFERRED")
+        if self.is_not_valid or set_not_valid:
+            parts.append("NOT VALID")
+        return " ".join(parts)
+
     def get_create_statement(self, set_not_valid=False):
         if self.index and self.constraint_type != "EXCLUDE":
             using_clause = "{} using index {}{}".format(
                 self.constraint_type, self.quoted_name, self.deferrable_subclause
+            )
+        elif self.is_fk and self.quoted_full_foreign_table_name:
+            using_clause = self._fk_definition(
+                set_not_valid=set_not_valid and not self.is_not_valid
             )
         else:
             using_clause = self.definition
@@ -1670,6 +1707,8 @@ class PostgreSQL:
                 )
                 constraint.fk_columns_foreign = i.fk_columns_foreign
                 constraint.fk_columns_local = i.fk_columns_local
+                constraint.fk_on_delete = i.fk_on_delete
+                constraint.fk_on_update = i.fk_on_update
 
             constraintlist.append(constraint)
 

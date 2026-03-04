@@ -1,61 +1,90 @@
+from __future__ import annotations
+
 from collections import OrderedDict as od
+from typing import TYPE_CHECKING, Any
 
 from .misc import AutoRepr, quoted_identifier, unquoted_identifier
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
 
 class Inspected(AutoRepr):
+    name: str
+    schema: str
+
     @property
-    def quoted_full_name(self):
+    def quoted_full_name(self) -> str:
         return quoted_identifier(self.name, schema=self.schema)
 
     @property
-    def signature(self):
+    def signature(self) -> str:
         return self.quoted_full_name
 
     @property
-    def unquoted_full_name(self):
+    def unquoted_full_name(self) -> str:
         return unquoted_identifier(self.name, schema=self.schema)
 
     @property
-    def quoted_name(self):
+    def quoted_name(self) -> str:
         return quoted_identifier(self.name)
 
     @property
-    def quoted_schema(self):
+    def quoted_schema(self) -> str:
         return quoted_identifier(self.schema)
 
-    def __ne__(self, other):
+    def __ne__(self, other: object) -> bool:
         return not self == other
 
 
-class TableRelated(object):
+class TableRelated:
+    schema: str
+    table_name: str
+
     @property
-    def quoted_full_table_name(self):
+    def quoted_full_table_name(self) -> str:
         return "{}.{}".format(
             quoted_identifier(self.schema), quoted_identifier(self.table_name)
         )
 
 
 class ColumnInfo(AutoRepr):
+    name: str
+    dbtype: str
+    dbtypestr: str
+    pytype: type | None
+    default: str | None
+    not_null: bool
+    is_enum: bool
+    enum: Any
+    collation: str | None
+    is_identity: bool
+    is_identity_always: bool
+    is_generated: bool
+    is_inherited: bool
+    can_drop_generated: bool
+    can_set_expression: bool
+    comment: str | None
+
     def __init__(
         self,
-        name,
-        dbtype,
-        pytype,
-        default=None,
-        not_null=False,
-        is_enum=False,
-        enum=None,
-        dbtypestr=None,
-        collation=None,
-        is_identity=False,
-        is_identity_always=False,
-        is_generated=False,
-        is_inherited=False,
-        can_drop_generated=False,
-        can_set_expression=False,
-        comment=None,
-    ):
+        name: str,
+        dbtype: str,
+        pytype: type | None,
+        default: str | None = None,
+        not_null: bool = False,
+        is_enum: bool = False,
+        enum: Any = None,
+        dbtypestr: str | None = None,
+        collation: str | None = None,
+        is_identity: bool = False,
+        is_identity_always: bool = False,
+        is_generated: bool = False,
+        is_inherited: bool = False,
+        can_drop_generated: bool = False,
+        can_set_expression: bool = False,
+        comment: str | None = None,
+    ) -> None:
         self.name = name or ""
         self.dbtype = dbtype
         self.dbtypestr = dbtypestr or dbtype
@@ -73,7 +102,9 @@ class ColumnInfo(AutoRepr):
         self.can_set_expression = can_set_expression
         self.comment = comment
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ColumnInfo):
+            return NotImplemented
         return (
             self.name == other.name
             and self.dbtype == other.dbtype
@@ -89,7 +120,7 @@ class ColumnInfo(AutoRepr):
             and self.comment == other.comment
         )
 
-    def alter_clauses(self, other):
+    def alter_clauses(self, other: ColumnInfo) -> list[str]:
         # ordering:
         # identify must be dropped before notnull
         # notnull must be added before identity
@@ -134,7 +165,7 @@ class ColumnInfo(AutoRepr):
 
         return clauses
 
-    def change_enum_to_string_statement(self, table_name):
+    def change_enum_to_string_statement(self, table_name: str) -> str:
         if self.is_enum:
             return "alter table {} alter column {} set data type varchar using {}::varchar;".format(
                 table_name, self.quoted_name, self.quoted_name
@@ -143,7 +174,7 @@ class ColumnInfo(AutoRepr):
         else:
             raise ValueError
 
-    def change_string_to_enum_statement(self, table_name):
+    def change_string_to_enum_statement(self, table_name: str) -> str:
         if self.is_enum:
             return (
                 "alter table {} alter column {} set data type {} using {}::{};".format(
@@ -157,7 +188,7 @@ class ColumnInfo(AutoRepr):
         else:
             raise ValueError
 
-    def change_enum_statement(self, table_name):
+    def change_enum_statement(self, table_name: str) -> str:
         if self.is_enum:
             return "alter table {} alter column {} type {} using {}::text::{};".format(
                 table_name,
@@ -169,26 +200,26 @@ class ColumnInfo(AutoRepr):
         else:
             raise ValueError
 
-    def drop_default_statement(self, table_name):
+    def drop_default_statement(self, table_name: str) -> str:
         return "alter table {} alter column {} drop default;".format(
             table_name, self.quoted_name
         )
 
-    def add_default_statement(self, table_name):
+    def add_default_statement(self, table_name: str) -> str:
         return "alter table {} alter column {} set default {};".format(
             table_name, self.quoted_name, self.default
         )
 
-    def alter_table_statements(self, other, table_name):
+    def alter_table_statements(self, other: ColumnInfo, table_name: str) -> list[str]:
         prefix = "alter table {}".format(table_name)
         return ["{} {};".format(prefix, c) for c in self.alter_clauses(other)]
 
     @property
-    def quoted_name(self):
+    def quoted_name(self) -> str:
         return quoted_identifier(self.name)
 
     @property
-    def creation_clause(self):
+    def creation_clause(self) -> str:
         x = "{} {}".format(self.quoted_name, self.dbtypestr)
         if self.is_identity:
             identity_type = "always" if self.is_identity_always else "by default"
@@ -202,20 +233,20 @@ class ColumnInfo(AutoRepr):
         return x
 
     @property
-    def add_column_clause(self):
+    def add_column_clause(self) -> str:
         return "add column {}{}".format(self.creation_clause, self.collation_subclause)
 
     @property
-    def drop_column_clause(self):
+    def drop_column_clause(self) -> str:
         return "drop column {k}".format(k=self.quoted_name)
 
     @property
-    def alter_not_null_clause(self):
+    def alter_not_null_clause(self) -> str:
         keyword = "set" if self.not_null else "drop"
         return "alter column {} {} not null".format(self.quoted_name, keyword)
 
     @property
-    def alter_default_clause(self):
+    def alter_default_clause(self) -> str:
         if self.default:
             alter = "alter column {} set default {}".format(
                 self.quoted_name, self.default
@@ -224,7 +255,7 @@ class ColumnInfo(AutoRepr):
             alter = "alter column {} drop default".format(self.quoted_name)
         return alter
 
-    def alter_default_clause_or_generated(self, other):
+    def alter_default_clause_or_generated(self, other: ColumnInfo) -> str:
         if self.default:
             alter = "alter column {} set default {}".format(
                 self.quoted_name, self.default
@@ -236,13 +267,13 @@ class ColumnInfo(AutoRepr):
         return alter
 
     @property
-    def alter_set_expression_clause(self):
+    def alter_set_expression_clause(self) -> str:
         """Generate ALTER COLUMN ... SET EXPRESSION for PG 17+."""
         return "alter column {} set expression as ({})".format(
             self.quoted_name, self.default
         )
 
-    def alter_identity_clause(self, other):
+    def alter_identity_clause(self, other: ColumnInfo) -> str:
         if self.is_identity:
             identity_type = "always" if self.is_identity_always else "by default"
             if other.is_identity:
@@ -258,7 +289,7 @@ class ColumnInfo(AutoRepr):
         return alter
 
     @property
-    def collation_subclause(self):
+    def collation_subclause(self) -> str:
         if self.collation:
             collate = " collate {}".format(quoted_identifier(self.collation))
         else:
@@ -266,7 +297,7 @@ class ColumnInfo(AutoRepr):
         return collate
 
     @property
-    def alter_data_type_clause(self):
+    def alter_data_type_clause(self) -> str:
         return "alter column {} set data type {}{} using {}::{}".format(
             self.quoted_name,
             self.dbtypestr,
@@ -276,7 +307,7 @@ class ColumnInfo(AutoRepr):
         )
 
     @property
-    def alter_enum_type_clause(self):
+    def alter_enum_type_clause(self) -> str:
         return "alter column {} set data type {}{} using {}::text::{}".format(
             self.quoted_name,
             self.dbtypestr,
@@ -285,18 +316,18 @@ class ColumnInfo(AutoRepr):
             self.dbtypestr,
         )
 
-    def comment_statement(self, table_name):
+    def comment_statement(self, table_name: str) -> str | None:
         """Generate COMMENT ON COLUMN statement."""
         if self.comment is None:
             return None
         escaped = self.comment.replace("'", "''")
         return f"COMMENT ON COLUMN {table_name}.{self.quoted_name} IS '{escaped}';"
 
-    def drop_comment_statement(self, table_name):
+    def drop_comment_statement(self, table_name: str) -> str:
         """Generate statement to drop column comment."""
         return f"COMMENT ON COLUMN {table_name}.{self.quoted_name} IS NULL;"
 
-    def comment_alter_statement(self, other, table_name):
+    def comment_alter_statement(self, other: ColumnInfo, table_name: str) -> str | None:
         """Generate ALTER statement for comment change, or None if unchanged."""
         if self.comment == other.comment:
             return None
@@ -305,7 +336,7 @@ class ColumnInfo(AutoRepr):
             return f"COMMENT ON COLUMN {table_name}.{self.quoted_name} IS '{escaped}';"
         return f"COMMENT ON COLUMN {table_name}.{self.quoted_name} IS NULL;"
 
-    def only_comment_changed(self, other):
+    def only_comment_changed(self, other: ColumnInfo) -> bool:
         """Check if only comment differs (no structural change)."""
         return (
             self.name == other.name
@@ -324,25 +355,46 @@ class ColumnInfo(AutoRepr):
 
 
 class InspectedSelectable(Inspected):
+    name: str
+    schema: str
+    columns: Mapping[str, ColumnInfo]
+    inputs: list[Any]
+    definition: str | None
+    relationtype: str
+    dependent_on: list[str]
+    dependents: list[str]
+    dependent_on_all: list[str]
+    dependents_all: list[str]
+    constraints: od[str, Any]
+    indexes: od[str, Any]
+    comment: str | None
+    parent_table: str | None
+    partition_def: str | None
+    rowsecurity: bool
+    forcerowsecurity: bool
+    persistence: str | None
+    options: list[str] | None
+    oid: int | None
+
     def __init__(
         self,
-        name,
-        schema,
-        columns,
-        inputs=None,
-        definition=None,
-        dependent_on=None,
-        dependents=None,
-        comment=None,
-        relationtype="unknown",
-        parent_table=None,
-        partition_def=None,
-        rowsecurity=False,
-        forcerowsecurity=False,
-        persistence=None,
-        options=None,
-        oid=None,
-    ):
+        name: str,
+        schema: str,
+        columns: Mapping[str, ColumnInfo],
+        inputs: list[Any] | None = None,
+        definition: str | None = None,
+        dependent_on: list[str] | None = None,
+        dependents: list[str] | None = None,
+        comment: str | None = None,
+        relationtype: str = "unknown",
+        parent_table: str | None = None,
+        partition_def: str | None = None,
+        rowsecurity: bool = False,
+        forcerowsecurity: bool = False,
+        persistence: str | None = None,
+        options: list[str] | None = None,
+        oid: int | None = None,
+    ) -> None:
         self.name = name
         self.schema = schema
         self.inputs = inputs or []
@@ -364,7 +416,9 @@ class InspectedSelectable(Inspected):
         self.options = options
         self.oid = oid
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, InspectedSelectable):
+            return NotImplemented
         equalities = (
             type(self) is type(other),
             self.relationtype == other.relationtype,
@@ -383,7 +437,7 @@ class InspectedSelectable(Inspected):
         return all(equalities)
 
     @property
-    def comment_statement(self):
+    def comment_statement(self) -> str | None:
         """Generate a COMMENT ON statement for this object."""
         if self.comment is None:
             return None
@@ -406,7 +460,7 @@ class InspectedSelectable(Inspected):
         )
 
     @property
-    def drop_comment_statement(self):
+    def drop_comment_statement(self) -> str:
         """Generate a statement to drop the comment for this object."""
         object_type_map = {
             "r": "TABLE",
@@ -420,7 +474,7 @@ class InspectedSelectable(Inspected):
         object_type = object_type_map.get(self.relationtype, "TABLE")
         return f"COMMENT ON {object_type} {self.quoted_full_name} IS NULL;"
 
-    def comment_alter_statements(self, other):
+    def comment_alter_statements(self, other: InspectedSelectable) -> list[str]:
         """Generate statements to alter comments between two versions."""
         statements = []
 
@@ -464,7 +518,7 @@ class InspectedSelectable(Inspected):
 
         return statements
 
-    def only_comment_changed(self, other):
+    def only_comment_changed(self, other: InspectedSelectable) -> bool:
         """Check if only the comment has changed between two versions of the same object."""
         # Check all attributes except comment
         equalities = (

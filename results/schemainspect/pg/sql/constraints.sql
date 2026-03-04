@@ -127,7 +127,23 @@ select
     contype = 'f' as is_fk,
     condeferrable as is_deferrable,
     condeferred as initially_deferred,
-    NOT convalidated as is_not_valid
+    NOT convalidated as is_not_valid,
+    case confdeltype
+        when 'a' then 'NO ACTION'
+        when 'r' then 'RESTRICT'
+        when 'c' then 'CASCADE'
+        when 'n' then 'SET NULL'
+        when 'd' then 'SET DEFAULT'
+        else null
+    end as fk_on_delete,
+    case confupdtype
+        when 'a' then 'NO ACTION'
+        when 'r' then 'RESTRICT'
+        when 'c' then 'CASCADE'
+        when 'n' then 'SET NULL'
+        when 'd' then 'SET DEFAULT'
+        else null
+    end as fk_on_update
 from
     pg_constraint
     INNER JOIN pg_class
