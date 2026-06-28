@@ -224,8 +224,9 @@ def format_results(results: list[StatementLockInfo], verbose: bool = False) -> s
     lines = []
 
     for i, info in enumerate(results, 1):
-        stmt_preview = textwrap.shorten(info.statement.strip(), width=72, placeholder="...")
-        lines.append(f"[{i}] {stmt_preview}")
+        stmt_text = textwrap.indent(info.statement.strip(), "    ")
+        lines.append(f"[{i}]")
+        lines.append(stmt_text)
 
         if info.error:
             lines.append(f"    ERROR: {info.error}")
@@ -258,9 +259,10 @@ def format_results(results: list[StatementLockInfo], verbose: bool = False) -> s
     if notable_stmts:
         lines.append(f"⚠  {len(notable_stmts)} statement(s) acquire notable locks (ShareUpdateExclusiveLock or stronger):")
         for r in notable_stmts:
-            preview = textwrap.shorten(r.statement.strip(), width=60, placeholder="...")
+            stmt_text = textwrap.indent(r.statement.strip(), "     ")
             max_mode = max(r.notable_locks, key=lambda l: l.severity_index).mode
-            lines.append(f"   - {preview}")
+            lines.append(f"   -")
+            lines.append(stmt_text)
             lines.append(f"     max lock: {max_mode}")
     else:
         lines.append("✓  No notable locks (all locks are RowExclusiveLock or weaker).")
