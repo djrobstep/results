@@ -222,7 +222,15 @@ class TestMigrationFromDefinition:
         defn = make_simple_definition()
         m = Migration(defn, defn)
         m.set_safety(False)
-        m.add_all_changes()
+        m.add_all_changes_ordered()
+        assert not m.statements
+
+    def test_identical_definitions_produce_no_changes_deprecated_path(self):
+        from results.dbdiff import Migration
+        defn = make_simple_definition()
+        m = Migration(defn, defn)
+        m.set_safety(False)
+        m.add_all_changes()  # deprecated — kept to verify the old path still works
         assert not m.statements
 
     def test_added_table_shows_up_in_diff(self):
@@ -250,7 +258,7 @@ class TestMigrationFromDefinition:
 
         m = Migration(defn_from, defn_to)
         m.set_safety(False)
-        m.add_all_changes()
+        m.add_all_changes_ordered()
         sql = m.sql
         assert "create" in sql.lower()
         assert "posts" in sql.lower()
@@ -266,7 +274,7 @@ class TestMigrationFromDefinition:
 
         m = Migration(defn_from, defn_to)
         m.set_safety(False)
-        m.add_all_changes()
+        m.add_all_changes_ordered()
         sql = m.sql
         assert "drop" in sql.lower()
 
@@ -284,7 +292,7 @@ class TestMigrationFromDefinition:
         }
         m = Migration(defn_from, defn_to)
         m.set_safety(False)
-        m.add_all_changes()
+        m.add_all_changes_ordered()
         sql = m.sql
         assert "add column" in sql.lower()
         assert "name" in sql.lower()

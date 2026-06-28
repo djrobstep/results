@@ -73,6 +73,11 @@ class Migration:
             self.add(self.changes.extensions(drops_only=True))
 
     def add_all_changes(self, privileges=False):
+        # DEPRECATED: use add_all_changes_ordered() instead.
+        # This method uses a hardcoded category sequence that does not track
+        # cross-category dependencies (e.g. a table whose column default calls
+        # a user-defined function). It is retained for debugging and comparison
+        # purposes only.
         self.add(self.changes.schemas(creations_only=True))
 
         self.add(self.changes.extensions(creations_only=True, modifications=False))

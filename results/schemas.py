@@ -29,7 +29,7 @@ class Schemas:
         if create_extensions_only:
             m.add_extension_changes(drops=False)
         else:
-            m.add_all_changes(privileges=with_privileges)
+            m.add_all_changes_ordered(privileges=with_privileges)
         return m.statements
 
     def schemadiff_as_sql(self, other, **kwargs):
