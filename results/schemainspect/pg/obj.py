@@ -1202,7 +1202,7 @@ class InspectedRowPolicy(Inspected, TableRelated):
 
     def __eq__(self, other):
         equalities = (
-            self.name == self.name,
+            self.name == other.name,
             self.schema == other.schema,
             self.permissiveness == other.permissiveness,
             self.commandtype == other.commandtype,
