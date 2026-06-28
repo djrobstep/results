@@ -13,6 +13,50 @@ def cli():
 
 
 def init_commands(cli):
+    @cli.command(
+        help=(
+            "Analyse what locks each statement in SQL_FILE acquires.\n\n"
+            "DB_URL is the database to copy schema from, or the special value "
+            "EMPTY to use a blank database. The script is never applied to the "
+            "real database — a temporary copy is created and dropped automatically."
+        )
+    )
+    @click.argument("sql_file", type=click.Path(exists=True, readable=True))
+    @click.argument("db_url", type=str, default="EMPTY")
+    @click.option("--verbose", "-v", is_flag=True, help="Show lock descriptions")
+    def lockinfo(sql_file, db_url, verbose):
+        import results
+        from results.lockinfo import analyse_locks, format_results
+        from results.tempdb import temporary_local_db
+
+        sql = click.open_file(sql_file).read()
+
+        if db_url == "EMPTY":
+            source_url = None
+        else:
+            source_url = db_url
+
+        with temporary_local_db(source_url) as temp_db:
+            if source_url:
+                # Copy schema from source into the temp db
+                source_db = results.db(source_url)
+                schema_sql = source_db.schemadiff_as_sql(temp_db)
+                if schema_sql:
+                    temp_db.q(schema_sql, fail_on_empty=False)
+
+            lock_results = analyse_locks(temp_db.url, sql)
+
+        output = format_results(lock_results, verbose=verbose)
+        click.echo(output)
+
+        # Exit 1 if any notable locks were found, 2 if any statements errored
+        errors = [r for r in lock_results if r.error]
+        notable = [r for r in lock_results if r.notable_locks]
+        if errors:
+            raise SystemExit(2)
+        if notable:
+            raise SystemExit(1)
+
     @cli.command(help="`diff` two databases, a -> b")
     @click.option("--schema", help="Restrict output to single schema", default=None)
     @click.option(
