@@ -1,4 +1,5 @@
 from . import pg
+from .definition import SchemaDefinition
 from .get import get_inspector
 from .inspected import ColumnInfo, Inspected
 from .inspector import NullInspector
@@ -11,4 +12,5 @@ __all__ = [
     "Inspected",
     "NullInspector",
     "PostgreSQL",
+    "SchemaDefinition",
 ]

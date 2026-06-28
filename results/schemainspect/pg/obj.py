@@ -27,6 +27,7 @@ DOMAINS_QUERY = resource_text("sql/domains.sql")
 EXTENSIONS_QUERY = resource_text("sql/extensions.sql")
 ENUMS_QUERY = resource_text("sql/enums.sql")
 DEPS_QUERY = resource_text("sql/deps.sql")
+FN_DEPS_QUERY = resource_text("sql/fn_deps.sql")
 PRIVILEGES_QUERY = resource_text("sql/privileges.sql")
 TRIGGERS_QUERY = resource_text("sql/triggers.sql")
 COLLATIONS_QUERY = resource_text("sql/collations.sql")
@@ -1296,6 +1297,7 @@ class PostgreSQL:
         self.EXTENSIONS_QUERY = processed(EXTENSIONS_QUERY)
         self.ENUMS_QUERY = processed(ENUMS_QUERY)
         self.DEPS_QUERY = processed(DEPS_QUERY)
+        self.FN_DEPS_QUERY = processed(FN_DEPS_QUERY)
         self.SCHEMAS_QUERY = processed(SCHEMAS_QUERY)
         self.PRIVILEGES_QUERY = processed(PRIVILEGES_QUERY)
         self.TRIGGERS_QUERY = processed(TRIGGERS_QUERY)
@@ -1397,6 +1399,26 @@ class PostgreSQL:
         ]
         self.privileges = od((i.key, i) for i in privileges)
 
+    def _apply_dep_rows(self, rows):
+        """Wire up dependent_on / dependents from a list of dep rows."""
+        for dep in rows:
+            x = quoted_identifier(dep.name, dep.schema, dep.identity_arguments)
+            x_dependent_on = quoted_identifier(
+                dep.name_dependent_on,
+                dep.schema_dependent_on,
+                dep.identity_arguments_dependent_on,
+            )
+            if x not in self.selectables:
+                continue
+            if x_dependent_on not in self.selectables:
+                continue
+            if x_dependent_on not in self.selectables[x].dependent_on:
+                self.selectables[x].dependent_on.append(x_dependent_on)
+                self.selectables[x].dependent_on.sort()
+            if x not in self.selectables[x_dependent_on].dependents:
+                self.selectables[x_dependent_on].dependents.append(x)
+                self.selectables[x_dependent_on].dependents.sort()
+
     def load_deps(self):
         q = self.execute(self.DEPS_QUERY)
 
@@ -1417,6 +1439,10 @@ class PostgreSQL:
                 self.selectables[x_dependent_on].dependents.sort()
             except LookupError:
                 pass
+
+        # Pick up table/view -> function dependencies from column defaults
+        fn_dep_rows = self.execute(self.FN_DEPS_QUERY)
+        self._apply_dep_rows(fn_dep_rows)
 
         for k, t in self.triggers.items():
             for dep_name in t.dependent_on:
@@ -1939,6 +1965,423 @@ class PostgreSQL:
 
     def exclude_schema(self, schema):
         self.filter_schema(exclude_schema=schema)
+
+    def as_definition(self):
+        """Return a SchemaDefinition: serializable, connection-free snapshot of this schema."""
+        from results.schemainspect.definition import SchemaDefinition
+
+        def col_to_dict(c):
+            return {
+                "name": c.name,
+                "dbtype": c.dbtype,
+                "dbtypestr": c.dbtypestr,
+                "default": c.default,
+                "not_null": c.not_null,
+                "is_enum": c.is_enum,
+                "enum_name": c.enum.name if c.enum else None,
+                "enum_schema": c.enum.schema if c.enum else None,
+                "collation": c.collation,
+                "is_identity": c.is_identity,
+                "is_identity_always": c.is_identity_always,
+                "is_generated": c.is_generated,
+                "is_inherited": c.is_inherited,
+                "comment": c.comment,
+            }
+
+        def selectable_to_dict(s):
+            return {
+                "name": s.name,
+                "schema": s.schema,
+                "relationtype": s.relationtype,
+                "definition": s.definition,
+                "columns": {k: col_to_dict(c) for k, c in s.columns.items()},
+                "comment": s.comment,
+                "parent_table": s.parent_table,
+                "partition_def": s.partition_def,
+                "rowsecurity": s.rowsecurity,
+                "forcerowsecurity": s.forcerowsecurity,
+                "persistence": s.persistence,
+                "options": s.options,
+                "dependent_on": list(s.dependent_on),
+            }
+
+        def function_to_dict(f):
+            return {
+                "name": f.name,
+                "schema": f.schema,
+                "identity_arguments": f.identity_arguments,
+                "result_string": f.result_string,
+                "language": f.language,
+                "definition": f.definition,
+                "volatility": f.volatility,
+                "strictness": f.strictness,
+                "security_type": f.security_type,
+                "full_definition": f.full_definition,
+                "comment": f.comment,
+                "returntype": f.returntype,
+                "kind": f.kind,
+                "columns": {k: col_to_dict(c) for k, c in f.columns.items()},
+                "inputs": [col_to_dict(c) for c in f.inputs],
+                "dependent_on": list(f.dependent_on),
+            }
+
+        return SchemaDefinition(
+            pg_version=self.pg_version,
+            schemas={k: {"schema": v.schema} for k, v in self.schemas.items()},
+            enums={
+                k: {"name": v.name, "schema": v.schema, "elements": list(v.elements)}
+                for k, v in self.enums.items()
+            },
+            tables={k: selectable_to_dict(v) for k, v in self.tables.items()},
+            views={k: selectable_to_dict(v) for k, v in self.views.items()},
+            materialized_views={k: selectable_to_dict(v) for k, v in self.materialized_views.items()},
+            composite_types={k: selectable_to_dict(v) for k, v in self.composite_types.items()},
+            functions={k: function_to_dict(v) for k, v in self.functions.items()},
+            sequences={
+                k: {"name": v.name, "schema": v.schema, "table_name": v.table_name, "column_name": v.column_name}
+                for k, v in self.sequences.items()
+            },
+            indexes={
+                k: {
+                    "name": v.name, "schema": v.schema, "table_name": v.table_name,
+                    "definition": v.definition, "key_columns": v.key_columns,
+                    "index_columns": v.index_columns, "included_columns": v.included_columns,
+                    "key_options": v.key_options, "num_att": v.num_att,
+                    "is_unique": v.is_unique, "is_pk": v.is_pk,
+                    "is_exclusion": v.is_exclusion, "is_immediate": v.is_immediate,
+                    "is_clustered": v.is_clustered, "key_collations": v.key_collations,
+                    "key_expressions": v.key_expressions,
+                    "partial_predicate": v.partial_predicate, "algorithm": v.algorithm,
+                }
+                for k, v in self.indexes.items()
+            },
+            constraints={
+                k: {
+                    "name": v.name, "schema": v.schema, "constraint_type": v.constraint_type,
+                    "table_name": v.table_name, "definition": v.definition,
+                    "is_fk": v.is_fk, "is_deferrable": v.is_deferrable,
+                    "initially_deferred": v.initially_deferred, "is_not_valid": v.is_not_valid,
+                    "quoted_full_foreign_table_name": v.quoted_full_foreign_table_name,
+                    "fk_columns_local": v.fk_columns_local,
+                    "fk_columns_foreign": v.fk_columns_foreign,
+                    "fk_on_delete": v.fk_on_delete, "fk_on_update": v.fk_on_update,
+                }
+                for k, v in self.constraints.items()
+            },
+            extensions={
+                k: {"name": v.name, "schema": v.schema, "version": v.version}
+                for k, v in self.extensions.items()
+            },
+            privileges={
+                k: {
+                    "object_type": v.object_type, "schema": v.schema, "name": v.name,
+                    "privilege": v.privilege, "target_user": v.target_user,
+                }
+                for k, v in self.privileges.items()
+            },
+            triggers={
+                k: {
+                    "name": v.name, "schema": v.schema, "table_name": v.table_name,
+                    "proc_schema": v.proc_schema, "proc_name": v.proc_name,
+                    "enabled": v.enabled, "full_definition": v.full_definition,
+                }
+                for k, v in self.triggers.items()
+            },
+            collations={
+                k: {
+                    "name": v.name, "schema": v.schema, "provider": v.provider,
+                    "encoding": v.encoding, "lc_collate": v.lc_collate,
+                    "lc_ctype": v.lc_ctype, "version": v.version, "locale": v.locale,
+                }
+                for k, v in self.collations.items()
+            },
+            rlspolicies={
+                k: {
+                    "name": v.name, "schema": v.schema, "table_name": v.table_name,
+                    "commandtype": v.commandtype, "permissive": v.permissive,
+                    "roles": list(v.roles), "qual": v.qual, "withcheck": v.withcheck,
+                }
+                for k, v in self.rlspolicies.items()
+            },
+            types={
+                k: {"name": v.name, "schema": v.schema, "columns": dict(v.columns), "comment": v.comment}
+                for k, v in self.types.items()
+            },
+            domains={
+                k: {
+                    "name": v.name, "schema": v.schema, "data_type": v.data_type,
+                    "collation": v.collation, "constraint_name": v.constraint_name,
+                    "not_null": v.not_null, "default": v.default, "check": v.check,
+                }
+                for k, v in self.domains.items()
+            },
+        )
+
+    @classmethod
+    def from_definition(cls, defn):
+        """
+        Construct a PostgreSQL inspector from a SchemaDefinition (no DB connection needed).
+        The returned object supports all diff operations.
+        """
+        from results.schemainspect.definition import SchemaDefinition
+
+        if isinstance(defn, dict):
+            defn = SchemaDefinition.from_dict(defn)
+
+        inst = object.__new__(cls)
+        inst.pg_version = defn.pg_version
+        inst.db_version = defn.pg_version
+        inst.connection_type = "definition"
+
+        # --- enums first (needed when reconstructing columns) ---
+        enumlist = [
+            InspectedEnum(
+                name=v["name"], schema=v["schema"],
+                elements=list(v["elements"]), pg_version=defn.pg_version,
+            )
+            for v in defn.enums.values()
+        ]
+        inst.enums = od((e.quoted_full_name, e) for e in enumlist)
+
+        def make_column(d):
+            enum_ref = None
+            if d.get("enum_name") and d.get("enum_schema"):
+                from results.schemainspect.misc import quoted_identifier
+                sig = "{}.{}".format(
+                    quoted_identifier(d["enum_schema"]),
+                    quoted_identifier(d["enum_name"]),
+                )
+                enum_ref = inst.enums.get(sig)
+            return ColumnInfo(
+                name=d["name"],
+                dbtype=d["dbtype"],
+                dbtypestr=d.get("dbtypestr") or d["dbtype"],
+                pytype=None,
+                default=d.get("default"),
+                not_null=d.get("not_null", False),
+                is_enum=d.get("is_enum", False),
+                enum=enum_ref,
+                collation=d.get("collation"),
+                is_identity=d.get("is_identity", False),
+                is_identity_always=d.get("is_identity_always", False),
+                is_generated=d.get("is_generated", False),
+                is_inherited=d.get("is_inherited", False),
+                can_drop_generated=defn.pg_version >= 13,
+                can_set_expression=defn.pg_version >= 17,
+                comment=d.get("comment"),
+            )
+
+        def make_selectable(d):
+            cols = od((k, make_column(c)) for k, c in d.get("columns", {}).items())
+            return InspectedSelectable(
+                name=d["name"], schema=d["schema"],
+                columns=cols,
+                relationtype=d.get("relationtype", "r"),
+                definition=d.get("definition"),
+                comment=d.get("comment"),
+                parent_table=d.get("parent_table"),
+                partition_def=d.get("partition_def"),
+                rowsecurity=d.get("rowsecurity", False),
+                forcerowsecurity=d.get("forcerowsecurity", False),
+                persistence=d.get("persistence"),
+                options=d.get("options"),
+                dependent_on=list(d.get("dependent_on", [])),
+            )
+
+        # schemas
+        inst.schemas = od(
+            (k, InspectedSchema(schema=v["schema"]))
+            for k, v in defn.schemas.items()
+        )
+
+        # tables / views / matviews / composite_types
+        inst.tables = od((k, make_selectable(v)) for k, v in defn.tables.items())
+        inst.views = od((k, make_selectable(v)) for k, v in defn.views.items())
+        inst.materialized_views = od((k, make_selectable(v)) for k, v in defn.materialized_views.items())
+        inst.composite_types = od((k, make_selectable(v)) for k, v in defn.composite_types.items())
+
+        inst.relations = od()
+        for x in (inst.tables, inst.views, inst.materialized_views):
+            inst.relations.update(x)
+
+        # functions
+        funclist = []
+        for k, d in defn.functions.items():
+            cols = od((c["name"], make_column(c)) for c in (d.get("columns") or {}).values())
+            inputs = [make_column(c) for c in (d.get("inputs") or [])]
+            f = InspectedFunction(
+                name=d["name"], schema=d["schema"],
+                columns=cols, inputs=inputs,
+                identity_arguments=d["identity_arguments"],
+                result_string=d["result_string"],
+                language=d["language"],
+                definition=d["definition"],
+                volatility=d["volatility"],
+                strictness=d["strictness"],
+                security_type=d["security_type"],
+                full_definition=d["full_definition"],
+                comment=d.get("comment"),
+                returntype=d.get("returntype"),
+                kind=d["kind"],
+            )
+            f.dependent_on = list(d.get("dependent_on", []))
+            funclist.append((k, f))
+        inst.functions = od(funclist)
+
+        inst.selectables = od()
+        inst.selectables.update(inst.relations)
+        inst.selectables.update(inst.composite_types)
+        inst.selectables.update(inst.functions)
+
+        # sequences
+        inst.sequences = od(
+            (k, InspectedSequence(
+                name=v["name"], schema=v["schema"],
+                table_name=v.get("table_name"), column_name=v.get("column_name"),
+            ))
+            for k, v in defn.sequences.items()
+        )
+
+        # indexes
+        indexlist = [
+            InspectedIndex(
+                name=v["name"], schema=v["schema"], table_name=v["table_name"],
+                definition=v.get("definition"),
+                key_columns=v.get("key_columns"),
+                index_columns=v.get("index_columns"),
+                included_columns=v.get("included_columns"),
+                key_options=v.get("key_options"),
+                num_att=v.get("num_att"),
+                is_unique=v.get("is_unique", False),
+                is_pk=v.get("is_pk", False),
+                is_exclusion=v.get("is_exclusion", False),
+                is_immediate=v.get("is_immediate", False),
+                is_clustered=v.get("is_clustered", False),
+                key_collations=v.get("key_collations"),
+                key_expressions=v.get("key_expressions"),
+                partial_predicate=v.get("partial_predicate"),
+                algorithm=v.get("algorithm"),
+            )
+            for k, v in defn.indexes.items()
+        ]
+        inst.indexes = od((i.quoted_full_name, i) for i in indexlist)
+
+        # constraints
+        constraintlist = []
+        for k, v in defn.constraints.items():
+            c = InspectedConstraint(
+                name=v["name"], schema=v["schema"],
+                constraint_type=v["constraint_type"],
+                table_name=v["table_name"],
+                definition=v.get("definition"),
+                index=None,
+                is_fk=v.get("is_fk", False),
+                is_deferrable=v.get("is_deferrable", False),
+                initially_deferred=v.get("initially_deferred", False),
+                is_not_valid=v.get("is_not_valid", False),
+            )
+            if c.is_fk:
+                c.quoted_full_foreign_table_name = v.get("quoted_full_foreign_table_name")
+                c.fk_columns_local = v.get("fk_columns_local")
+                c.fk_columns_foreign = v.get("fk_columns_foreign")
+                c.fk_on_delete = v.get("fk_on_delete")
+                c.fk_on_update = v.get("fk_on_update")
+            constraintlist.append(c)
+        inst.constraints = od((c.quoted_full_name, c) for c in constraintlist)
+
+        # extensions
+        inst.extensions = od(
+            (k, InspectedExtension(
+                name=v["name"], schema=v["schema"], version=v.get("version"),
+            ))
+            for k, v in defn.extensions.items()
+        )
+
+        # privileges
+        inst.privileges = od(
+            (k, InspectedPrivilege(
+                object_type=v["object_type"], schema=v["schema"], name=v["name"],
+                privilege=v["privilege"], target_user=v["target_user"],
+            ))
+            for k, v in defn.privileges.items()
+        )
+
+        # triggers
+        triggerlist = [
+            InspectedTrigger(
+                v["name"], v["schema"], v["table_name"],
+                v["proc_schema"], v["proc_name"], v["enabled"], v["full_definition"],
+            )
+            for v in defn.triggers.values()
+        ]
+        inst.triggers = od((t.signature, t) for t in triggerlist)
+
+        # collations
+        inst.collations = od(
+            (k, InspectedCollation(
+                name=v["name"], schema=v["schema"], provider=v["provider"],
+                encoding=v["encoding"], lc_collate=v["lc_collate"],
+                lc_ctype=v["lc_ctype"], version=v["version"], locale=v["locale"],
+            ))
+            for k, v in defn.collations.items()
+        )
+
+        # rlspolicies
+        inst.rlspolicies = od(
+            (k, InspectedRowPolicy(
+                name=v["name"], schema=v["schema"], table_name=v["table_name"],
+                commandtype=v["commandtype"], permissive=v["permissive"],
+                roles=v["roles"], qual=v["qual"], withcheck=v["withcheck"],
+            ))
+            for k, v in defn.rlspolicies.items()
+        )
+
+        # types
+        inst.types = od(
+            (k, InspectedType(
+                name=v["name"], schema=v["schema"],
+                columns=dict(v.get("columns", {})), comment=v.get("comment"),
+            ))
+            for k, v in defn.types.items()
+        )
+
+        # domains
+        inst.domains = od(
+            (k, InspectedDomain(
+                name=v["name"], schema=v["schema"],
+                data_type=v["data_type"], collation=v.get("collation"),
+                constraint_name=v.get("constraint_name"),
+                not_null=v.get("not_null", False),
+                default=v.get("default"), check=v.get("check"),
+            ))
+            for k, v in defn.domains.items()
+        )
+
+        # wire up indexes and constraints to their tables (same as load_all_relations)
+        for each in inst.indexes.values():
+            t = each.quoted_full_table_name
+            try:
+                inst.relations[t].indexes[each.quoted_full_name] = each
+            except (KeyError, AttributeError):
+                pass
+        for each in inst.constraints.values():
+            t = each.quoted_full_table_name
+            try:
+                inst.relations[t].constraints[each.quoted_full_name] = each
+            except (KeyError, AttributeError):
+                pass
+
+        # rebuild dependents (reverse of dependent_on) across all selectables
+        for k, x in inst.selectables.items():
+            for dep in x.dependent_on:
+                if dep in inst.selectables:
+                    if k not in inst.selectables[dep].dependents:
+                        inst.selectables[dep].dependents.append(k)
+
+        # rebuild dependent_on_all / dependents_all
+        inst.load_deps_all()
+
+        return inst
 
     def __eq__(self, other):
         """

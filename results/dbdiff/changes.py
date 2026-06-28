@@ -733,6 +733,57 @@ class Changes(object):
             non_tables_only=True,
         )
 
+    def _selectables_filtered(self, fn_filter):
+        """Helper: return (from, target) selectables dicts filtered by fn_filter."""
+        return (
+            od((k, v) for k, v in sorted(self.i_from.selectables.items()) if fn_filter(v)),
+            od((k, v) for k, v in sorted(self.i_target.selectables.items()) if fn_filter(v)),
+        )
+
+    @property
+    def function_drops(self):
+        """Drop changes for functions only (relationtype == 'f')."""
+        a, b = self._selectables_filtered(lambda v: getattr(v, "relationtype", None) == "f")
+        return partial(
+            get_selectable_changes, a, b,
+            self.i_from.enums, self.i_target.enums,
+            self.i_from.sequences, self.i_target.sequences,
+            drops_only=True, non_tables_only=True,
+        )
+
+    @property
+    def function_creations(self):
+        """Create/replace changes for functions only (relationtype == 'f')."""
+        a, b = self._selectables_filtered(lambda v: getattr(v, "relationtype", None) == "f")
+        return partial(
+            get_selectable_changes, a, b,
+            self.i_from.enums, self.i_target.enums,
+            self.i_from.sequences, self.i_target.sequences,
+            creations_only=True, non_tables_only=True,
+        )
+
+    @property
+    def non_function_non_table_selectable_drops(self):
+        """Drop changes for views/matviews/composite types (not functions, not tables)."""
+        a, b = self._selectables_filtered(lambda v: getattr(v, "relationtype", None) not in ("f", "r", "p"))
+        return partial(
+            get_selectable_changes, a, b,
+            self.i_from.enums, self.i_target.enums,
+            self.i_from.sequences, self.i_target.sequences,
+            drops_only=True, non_tables_only=True,
+        )
+
+    @property
+    def non_function_non_table_selectable_creations(self):
+        """Create changes for views/matviews/composite types (not functions, not tables)."""
+        a, b = self._selectables_filtered(lambda v: getattr(v, "relationtype", None) not in ("f", "r", "p"))
+        return partial(
+            get_selectable_changes, a, b,
+            self.i_from.enums, self.i_target.enums,
+            self.i_from.sequences, self.i_target.sequences,
+            creations_only=True, non_tables_only=True,
+        )
+
     @property
     def non_pk_constraints(self):
         a = self.i_from.constraints.items()

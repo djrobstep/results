@@ -1,4 +1,4 @@
-from results.schemainspect import PostgreSQL, get_inspector
+from results.schemainspect import PostgreSQL, SchemaDefinition, get_inspector
 
 from .changes import Changes
 from .statements import Statements
@@ -23,22 +23,24 @@ class Migration:
             raise ValueError("You cannot have both a schema and excluded schema")
         self.schema = schema
         self.exclude_schema = exclude_schema
-        if isinstance(x_from, PostgreSQL):
-            self.changes.i_from = x_from
-        else:
-            self.changes.i_from = get_inspector(
-                x_from, schema=schema, exclude_schema=exclude_schema
-            )
-            if x_from:
-                self.s_from = x_from
-        if isinstance(x_target, PostgreSQL):
-            self.changes.i_target = x_target
-        else:
-            self.changes.i_target = get_inspector(
-                x_target, schema=schema, exclude_schema=exclude_schema
-            )
-            if x_target:
-                self.s_target = x_target
+
+        def to_inspector(x):
+            if isinstance(x, PostgreSQL):
+                return x
+            if isinstance(x, SchemaDefinition):
+                return PostgreSQL.from_definition(x)
+            if isinstance(x, dict):
+                return PostgreSQL.from_definition(SchemaDefinition.from_dict(x))
+            insp = get_inspector(x, schema=schema, exclude_schema=exclude_schema)
+            return insp
+
+        self.changes.i_from = to_inspector(x_from)
+        self.changes.i_target = to_inspector(x_target)
+
+        if not isinstance(x_from, (PostgreSQL, SchemaDefinition, dict)) and x_from:
+            self.s_from = x_from
+        if not isinstance(x_target, (PostgreSQL, SchemaDefinition, dict)) and x_target:
+            self.s_target = x_target
 
         self.changes.ignore_extension_versions = ignore_extension_versions
 
@@ -111,6 +113,18 @@ class Migration:
         self.add(self.changes.triggers(creations_only=True))
         self.add(self.changes.collations(drops_only=True))
         self.add(self.changes.schemas(drops_only=True))
+
+    def add_all_changes_ordered(self, privileges=False):
+        """
+        Like add_all_changes() but uses full dependency-aware toposort ordering
+        across all object categories instead of a hardcoded sequence.
+
+        The output is guaranteed to be correctly ordered for any schema as long as
+        there are no genuine circular dependencies (which Postgres itself disallows).
+        """
+        from .ordered import ordered_changes
+        for stmt in ordered_changes(self.changes, privileges=privileges):
+            self.add(stmt)
 
     @property
     def sql(self):
