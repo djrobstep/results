@@ -47,8 +47,12 @@ class Schemas:
     ) -> str:
         from .database import Database
         from .tempdb import temporary_local_db
+        from results.schemainspect import SchemaDefinition
 
-        if isinstance(other, str):
+        if isinstance(other, SchemaDefinition):
+            statements = self.schemadiff_as_statements(other, **kwargs)
+
+        elif isinstance(other, str):
             tempdb = tempdb or temporary_local_db
             with tempdb() as other_db:
                 other_db.q(other)

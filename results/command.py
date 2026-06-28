@@ -57,7 +57,7 @@ def init_commands(cli):
         if notable:
             raise SystemExit(1)
 
-    @cli.command(help="`diff` two databases, a -> b")
+    @cli.command(help="`diff` two schemas, a -> b. Each argument can be a DB URL or a definition file (.yaml/.json).")
     @click.option("--schema", help="Restrict output to single schema", default=None)
     @click.option(
         "--exclude-schema",
@@ -80,13 +80,25 @@ def init_commands(cli):
         default=False,
         help="Also output privilege differences (ie. grant/revoke statements)",
     )
-    @click.argument("db_url_a", type=str, nargs=1)
-    @click.argument("db_url_b", type=str, nargs=1)
-    def dbdiff(db_url_a, db_url_b, **kwargs):
-        db_a = results.db(db_url_a)
-        db_b = results.db(db_url_b)
+    @click.argument("a", type=str, nargs=1)
+    @click.argument("b", type=str, nargs=1)
+    def dbdiff(a, b, **kwargs):
+        from results.schemainspect import SchemaDefinition
 
-        schemadiff_sql = db_a.schemadiff_as_sql(db_b, **kwargs)
+        def load(arg):
+            import os
+            if os.path.isfile(arg):
+                text = open(arg).read()
+                if arg.endswith(".json"):
+                    return SchemaDefinition.from_json(text)
+                else:
+                    return SchemaDefinition.from_yaml(text)
+            return results.db(arg)
+
+        source_a = load(a)
+        source_b = load(b)
+
+        schemadiff_sql = source_a.schemadiff_as_sql(source_b, **kwargs)
 
         if schemadiff_sql:
             print(schemadiff_sql)

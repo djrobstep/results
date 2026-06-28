@@ -74,6 +74,23 @@ class SchemaDefinition:
         import yaml
         return cls.from_dict(yaml.safe_load(s))
 
+    def schemadiff_as_statements(self, other, **kwargs):
+        """Diff this definition against another definition or live DB connection."""
+        from results.dbdiff import Migration
+
+        m = Migration(self, other, **{k: v for k, v in kwargs.items()
+                                      if k in ("schema", "exclude_schema", "ignore_extension_versions")})
+        m.set_safety(False)
+
+        if kwargs.get("create_extensions_only"):
+            m.add_extension_changes(drops=False)
+        else:
+            m.add_all_changes_ordered(privileges=kwargs.get("with_privileges", False))
+        return m.statements
+
+    def schemadiff_as_sql(self, other, **kwargs) -> str:
+        return self.schemadiff_as_statements(other, **kwargs).sql
+
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, SchemaDefinition):
             return NotImplemented

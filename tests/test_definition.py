@@ -394,3 +394,41 @@ class TestOrderedChanges:
         view_pos = sql.lower().find("active_users")
         table_pos = sql.lower().find("drop table")
         assert view_pos < table_pos, "view drop should precede table drop"
+
+
+# ---------------------------------------------------------------------------
+# SchemaDefinition as the source side of a diff
+# ---------------------------------------------------------------------------
+
+class TestDefinitionAsDiffSource:
+    def test_definition_schemadiff_as_sql_identical(self):
+        defn = make_simple_definition()
+        assert defn.schemadiff_as_sql(defn) == ""
+
+    def test_definition_schemadiff_as_sql_added_table(self):
+        defn_from = make_simple_definition()
+        defn_to = make_simple_definition()
+        defn_to.tables['"public"."logs"'] = {
+            "name": "logs", "schema": "public", "relationtype": "r",
+            "definition": None,
+            "columns": {"id": {
+                "name": "id", "dbtype": "integer", "dbtypestr": "integer",
+                "not_null": True, "default": None, "is_enum": False,
+                "enum_name": None, "enum_schema": None, "collation": None,
+                "is_identity": False, "is_identity_always": False,
+                "is_generated": False, "is_inherited": False, "comment": None,
+            }},
+            "comment": None, "parent_table": None, "partition_def": None,
+            "rowsecurity": False, "forcerowsecurity": False,
+            "persistence": "p", "options": None, "dependent_on": [],
+        }
+        sql = defn_from.schemadiff_as_sql(defn_to)
+        assert "logs" in sql.lower()
+        assert "create" in sql.lower()
+
+    def test_definition_schemadiff_as_statements_returns_statements(self):
+        from results.dbdiff.statements import Statements
+        defn = make_simple_definition()
+        result = defn.schemadiff_as_statements(defn)
+        assert isinstance(result, Statements)
+        assert not result  # identical — no changes
