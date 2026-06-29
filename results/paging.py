@@ -8,8 +8,8 @@ ASC_OR_DESC = ("desc", "asc")
 
 
 def quoted(column_name):
-    """Quote a column name for SQL."""
-    return f'"{column_name}"'
+    """Quote a column name for SQL, escaping any internal double-quotes."""
+    return '"' + column_name.replace('"', '""') + '"'
 
 
 def parse_order_by_col(column_spec):

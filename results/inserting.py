@@ -112,9 +112,9 @@ class Inserting:
                 valuespec = ", ".join(f":{renaming_map[k]}" for k in keys)
             else:
                 valuespec = ", ".join(f":{k}" for k in keys)
-            q = INSERT.format(table=table, colspec=colspec, valuespec=valuespec)
+            q = INSERT.format(table=qi(table), colspec=colspec, valuespec=valuespec)
         else:
-            q = INSERT_DEFAULT.format(table=table)
+            q = INSERT_DEFAULT.format(table=qi(table))
 
         if upsert_on:
             if update_cols is None:
