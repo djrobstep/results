@@ -62,6 +62,9 @@ class Schemas:
             other_db = other
             statements = self.schemadiff_as_statements(other_db, **kwargs)
 
+        else:
+            raise TypeError(f"Unsupported type for sync target: {type(other)}")
+
         if not statements:
             if matching_message is not False:
                 matching_text = matching_message or MATCHING_MESSAGE
